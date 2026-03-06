@@ -8,7 +8,8 @@ const scene = createScene();
 const camera = createCamera();
 const renderer = createRenderer();
 
-document.body.appendChild(renderer.domElement);
+const threeJsElement = document.getElementById("threejs");
+threeJsElement.appendChild(renderer.domElement);
 
 function animate() {
   requestAnimationFrame(animate);
