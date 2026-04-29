@@ -11,6 +11,12 @@ const renderer = createRenderer();
 const threeJsElement = document.getElementById("threejs");
 threeJsElement.appendChild(renderer.domElement);
 
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
