@@ -1,4 +1,96 @@
 body {
   margin: 0;
   overflow: hidden;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.path-toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(920px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(14, 19, 24, 0.86);
+  color: #f2f6fb;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  z-index: 100;
+}
+
+.path-toolbar-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.path-toolbar-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.path-toolbar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.path-toolbar-field select,
+.path-toolbar-field input[type="range"],
+.path-toolbar-field button,
+.path-clear {
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f6fb;
+  padding: 0 10px;
+}
+
+.path-toolbar-field select {
+  appearance: none;
+}
+
+.path-toggle.active {
+  border-color: #66ccff;
+  background: rgba(102, 204, 255, 0.24);
+}
+
+.path-size-value {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.path-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.path-check input {
+  width: 16px;
+  height: 16px;
+}
+
+.path-clear {
+  cursor: pointer;
+}
+
+@media (max-width: 820px) {
+  .path-toolbar {
+    bottom: 10px;
+    padding: 10px;
+  }
+
+  .path-toolbar-controls {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
 }

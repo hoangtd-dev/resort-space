@@ -26,13 +26,25 @@ const COLOR_MAKE_INNER = 0xff8800;
 const COLOR_LEVEL_OUTER = 0x66ff66;
 const COLOR_LEVEL_INNER = 0x009933;
 
+const PREVIEW_OFFSET = 0.06;
+const PLACED_OFFSET = 0.05;
+const DEFAULT_TILE_SIZE = 4;
+
+const PATH_TYPES = {
+  stone: { label: "Stone", color: 0x8f959d },
+  grass: { label: "Grass", color: 0x6ea05e },
+  dirt: { label: "Dirt", color: 0x7a5230 },
+  sand: { label: "Sand", color: 0xd7be82 },
+  water: { label: "Water", color: 0x3d89c7 },
+};
+
 export function createTerrainEditor({ scene, camera, controls, renderer }) {
   const land = scene.getObjectByName("land");
   if (!land) throw new Error("terrainEditor: scene has no object named 'land'");
 
   const sampleHeight = makeHeightSampler(land);
 
-  const state = {
+  const hillState = {
     tool: TOOL_OFF,
     hillAction: ACTION_MAKE,
     makeAlgo: ALGO_LIFT_SMOOTH,
@@ -43,11 +55,39 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     smoothness: 5,
   };
 
+  const pathState = {
+    enabled: true,
+    pathType: "stone",
+    tileSize: DEFAULT_TILE_SIZE,
+    snap: true,
+  };
+
   const indicator = createDonutIndicator(RING_SEGMENTS);
   indicator.visible = false;
   scene.add(indicator);
   const outerRing = indicator.children[0];
   const innerRing = indicator.children[1];
+
+  const placementLayer = new THREE.Group();
+  placementLayer.name = "pathTiles";
+  scene.add(placementLayer);
+
+  const pathPreview = new THREE.Mesh(
+    new THREE.PlaneGeometry(pathState.tileSize, pathState.tileSize),
+    createTileMaterial(pathState.pathType, 0.55),
+  );
+  pathPreview.rotation.x = -Math.PI / 2;
+  pathPreview.visible = false;
+  pathPreview.renderOrder = 500;
+  pathPreview.material.depthWrite = false;
+  scene.add(pathPreview);
+
+  const toolbar = createPathToolbar(pathState, {
+    onTypeChange: refreshPathPreviewMaterial,
+    onSizeChange: rebuildPathPreviewGeometry,
+    onClear: clearTiles,
+  });
+  document.body.appendChild(toolbar);
 
   const gui = new GUI({ title: "Terrain — off" });
 
@@ -57,20 +97,20 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   const hillFolder = gui.addFolder("Hill action");
   hillFolder
-    .add(state, "hillAction", { "Make Hill": ACTION_MAKE, Level: ACTION_LEVEL })
+    .add(hillState, "hillAction", { "Make Hill": ACTION_MAKE, Level: ACTION_LEVEL })
     .name("Action")
     .onChange(refreshIndicatorColor);
   hillFolder
-    .add(state, "makeAlgo", {
+    .add(hillState, "makeAlgo", {
       "Naive (just lift)": ALGO_NAIVE,
       "Level → Lift": ALGO_LEVEL_LIFT,
       "Lift + Smooth": ALGO_LIFT_SMOOTH,
     })
     .name("Make algorithm");
-  hillFolder.add(state, "smoothness", 0, 20, 0.5).name("smoothness");
+  hillFolder.add(hillState, "smoothness", 0, 20, 0.5).name("smoothness");
 
-  gui.add(state, "size", 1, 30, 0.5);
-  gui.add(state, "hardness", 0, 1, 0.05);
+  gui.add(hillState, "size", 1, 30, 0.5);
+  gui.add(hillState, "hardness", 0, 1, 0.05);
 
   gui.add({ reset: () => resetTerrain() }, "reset").name("Reset Terrain");
 
@@ -79,16 +119,17 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     for (let i = 0; i < positions.count; i++) positions.setZ(i, 0);
     positions.needsUpdate = true;
     land.geometry.computeVertexNormals();
+    clearTiles();
   }
 
   function toggleTool(t) {
-    state.tool = state.tool === t ? TOOL_OFF : t;
+    hillState.tool = hillState.tool === t ? TOOL_OFF : t;
     gui.title(
-      `Terrain — ${state.tool}${
-        state.tool === TOOL_OFF ? "" : " (hold Shift to paint)"
+      `Terrain — ${hillState.tool}${
+        hillState.tool === TOOL_OFF ? "" : " (hold Shift to paint)"
       }`,
     );
-    if (state.tool === TOOL_OFF) {
+    if (hillState.tool === TOOL_OFF) {
       indicator.visible = false;
       controls.enabled = true;
       isShiftDown = false;
@@ -99,13 +140,55 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   }
 
   function refreshIndicatorColor() {
-    if (state.tool === TOOL_HILL && state.hillAction === ACTION_LEVEL) {
+    if (hillState.tool === TOOL_HILL && hillState.hillAction === ACTION_LEVEL) {
       outerRing.material.color.setHex(COLOR_LEVEL_OUTER);
       innerRing.material.color.setHex(COLOR_LEVEL_INNER);
     } else {
       outerRing.material.color.setHex(COLOR_MAKE_OUTER);
       innerRing.material.color.setHex(COLOR_MAKE_INNER);
     }
+  }
+
+  function refreshPathPreviewMaterial() {
+    pathPreview.material.dispose();
+    pathPreview.material = createTileMaterial(pathState.pathType, 0.55);
+    pathPreview.material.depthWrite = false;
+  }
+
+  function rebuildPathPreviewGeometry() {
+    pathPreview.geometry.dispose();
+    pathPreview.geometry = new THREE.PlaneGeometry(
+      pathState.tileSize,
+      pathState.tileSize,
+    );
+  }
+
+  function clearTiles() {
+    while (placementLayer.children.length > 0) {
+      const child = placementLayer.children.pop();
+      child.geometry.dispose();
+      child.material.dispose();
+    }
+  }
+
+  function placeTile(worldX, worldZ) {
+    const { x, z } = toPlacementPoint(
+      worldX,
+      worldZ,
+      pathState.tileSize,
+      pathState.snap,
+    );
+    const y = sampleHeight(x, z) + PLACED_OFFSET;
+
+    const tile = new THREE.Mesh(
+      new THREE.PlaneGeometry(pathState.tileSize, pathState.tileSize),
+      createTileMaterial(pathState.pathType, 0.95),
+    );
+
+    tile.rotation.x = -Math.PI / 2;
+    tile.position.set(x, y, z);
+    tile.receiveShadow = true;
+    placementLayer.add(tile);
   }
 
   const raycaster = new THREE.Raycaster();
@@ -121,21 +204,36 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   canvas.addEventListener("pointerenter", () => (pointerOnCanvas = true));
   canvas.addEventListener("pointerleave", () => {
     pointerOnCanvas = false;
+    hasHit = false;
+    pathPreview.visible = false;
+    if (hillState.tool !== TOOL_HILL) indicator.visible = false;
   });
   canvas.addEventListener("pointermove", (e) => {
     const rect = canvas.getBoundingClientRect();
     pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   });
-  canvas.addEventListener("pointerdown", (e) => {
-    if (e.button === 0 && state.tool !== TOOL_OFF && isShiftDown) {
-      isPainting = true;
-      e.preventDefault();
-    }
-  });
+  canvas.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.button !== 0 || !hasHit) return;
+
+      if (hillState.tool !== TOOL_OFF && isShiftDown) {
+        isPainting = true;
+        e.preventDefault();
+        return;
+      }
+
+      if (pathState.enabled) {
+        placeTile(lastHitWorld.x, lastHitWorld.z);
+        e.preventDefault();
+      }
+    },
+    { capture: true },
+  );
   window.addEventListener("pointerup", () => (isPainting = false));
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Shift" && state.tool !== TOOL_OFF) {
+    if (e.key === "Shift" && hillState.tool !== TOOL_OFF) {
       isShiftDown = true;
       controls.enabled = false;
     }
@@ -150,27 +248,33 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   const clock = new THREE.Clock();
 
-  function update() {
-    const dt = clock.getDelta();
+  function updatePathPreview() {
+    if (!pathState.enabled || !hasHit) {
+      pathPreview.visible = false;
+      return;
+    }
 
-    if (state.tool === TOOL_OFF) {
+    const { x, z } = toPlacementPoint(
+      lastHitWorld.x,
+      lastHitWorld.z,
+      pathState.tileSize,
+      pathState.snap,
+    );
+    const y = sampleHeight(x, z) + PREVIEW_OFFSET;
+    pathPreview.position.set(x, y, z);
+    pathPreview.visible = true;
+  }
+
+  function updateHillTool(dt) {
+    if (hillState.tool === TOOL_OFF) {
       indicator.visible = false;
       return;
     }
 
-    if (pointerOnCanvas) {
-      raycaster.setFromCamera(pointerNDC, camera);
-      const hits = raycaster.intersectObject(land);
-      if (hits.length > 0) {
-        lastHitWorld.copy(hits[0].point);
-        hasHit = true;
-      }
-    }
-
     indicator.visible = hasHit;
     if (hasHit) {
-      const outer = state.size;
-      const inner = Math.max(state.size * (1 - state.hardness), 0.001);
+      const outer = hillState.size;
+      const inner = Math.max(hillState.size * (1 - hillState.hardness), 0.001);
       writeRingPoints(
         outerRing,
         lastHitWorld.x,
@@ -186,22 +290,22 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
         sampleHeight,
       );
 
-      if (isPainting && isShiftDown && state.tool === TOOL_HILL) {
+      if (isPainting && isShiftDown && hillState.tool === TOOL_HILL) {
         const hitLocal = land.worldToLocal(lastHitWorld.clone());
         const params = {
-          size: state.size,
-          hardness: state.hardness,
-          strength: state.strength,
-          levelSpeed: state.levelSpeed,
-          smoothness: state.smoothness,
+          size: hillState.size,
+          hardness: hillState.hardness,
+          strength: hillState.strength,
+          levelSpeed: hillState.levelSpeed,
+          smoothness: hillState.smoothness,
           direction: 1,
           dt,
         };
-        if (state.hillAction === ACTION_LEVEL) {
+        if (hillState.hillAction === ACTION_LEVEL) {
           applyCircleBrushLevelOnly(land.geometry, hitLocal, params);
-        } else if (state.makeAlgo === ALGO_LEVEL_LIFT) {
+        } else if (hillState.makeAlgo === ALGO_LEVEL_LIFT) {
           applyCircleBrushLevelLift(land.geometry, hitLocal, params);
-        } else if (state.makeAlgo === ALGO_LIFT_SMOOTH) {
+        } else if (hillState.makeAlgo === ALGO_LIFT_SMOOTH) {
           applyCircleBrushLiftSmooth(land.geometry, hitLocal, params);
         } else {
           applyCircleBrush(land.geometry, hitLocal, params);
@@ -210,11 +314,25 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     }
   }
 
+  function update() {
+    const dt = clock.getDelta();
+
+    if (pointerOnCanvas) {
+      raycaster.setFromCamera(pointerNDC, camera);
+      const hits = raycaster.intersectObject(land);
+      hasHit = hits.length > 0;
+      if (hasHit) {
+        lastHitWorld.copy(hits[0].point);
+      }
+    }
+
+    updatePathPreview();
+    updateHillTool(dt);
+  }
+
   return { update };
 }
 
-// Donut indicator: two LineLoops in world-space coords. Each frame we resample
-// terrain heights along the ring so it visibly drapes over the surface.
 function createDonutIndicator(segments) {
   const group = new THREE.Group();
   group.name = "brushIndicator";
@@ -253,14 +371,117 @@ function writeRingPoints(line, cx, cz, radius, sampleHeight) {
   line.geometry.computeBoundingSphere();
 }
 
-// Bilinear height sampler for a PlaneGeometry-based ground rotated -π/2 on X.
-//
-// The plane stores vertices in local space (x, y) with z = height. After the
-// land mesh's -π/2 X rotation, world Y = local Z (height) and world Z = -local Y.
-// Vertex grid layout (Three.js PlaneGeometry):
-//   ix = 0..wSeg, iy = 0..hSeg
-//   localX = ix*cw - w/2,  localY = h/2 - iy*ch
-//   index  = iy * (wSeg+1) + ix
+function toPlacementPoint(worldX, worldZ, tileSize, snap) {
+  if (!snap) return { x: worldX, z: worldZ };
+  return {
+    x: Math.round(worldX / tileSize) * tileSize,
+    z: Math.round(worldZ / tileSize) * tileSize,
+  };
+}
+
+function createTileMaterial(type, opacity) {
+  const color = PATH_TYPES[type]?.color ?? PATH_TYPES.stone.color;
+  return new THREE.MeshStandardMaterial({
+    color,
+    transparent: opacity < 1,
+    opacity,
+    side: THREE.DoubleSide,
+    roughness: 0.95,
+    metalness: 0.04,
+  });
+}
+
+function createPathToolbar(state, callbacks) {
+  const toolbar = document.createElement("div");
+  toolbar.className = "path-toolbar";
+
+  const title = document.createElement("div");
+  title.className = "path-toolbar-title";
+  title.textContent = "Path Placement";
+  toolbar.appendChild(title);
+
+  const controls = document.createElement("div");
+  controls.className = "path-toolbar-controls";
+
+  const enabledLabel = document.createElement("label");
+  enabledLabel.className = "path-toolbar-field";
+  enabledLabel.textContent = "Tool";
+  const enabledToggle = document.createElement("button");
+  enabledToggle.type = "button";
+  enabledToggle.textContent = "Enabled";
+  enabledToggle.className = "path-toggle active";
+  enabledToggle.addEventListener("click", () => {
+    state.enabled = !state.enabled;
+    enabledToggle.textContent = state.enabled ? "Enabled" : "Disabled";
+    enabledToggle.classList.toggle("active", state.enabled);
+  });
+  enabledLabel.appendChild(enabledToggle);
+  controls.appendChild(enabledLabel);
+
+  const typeLabel = document.createElement("label");
+  typeLabel.className = "path-toolbar-field";
+  typeLabel.textContent = "Type";
+  const typeSelect = document.createElement("select");
+  for (const [key, value] of Object.entries(PATH_TYPES)) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = value.label;
+    if (key === state.pathType) option.selected = true;
+    typeSelect.appendChild(option);
+  }
+  typeSelect.addEventListener("change", () => {
+    state.pathType = typeSelect.value;
+    callbacks.onTypeChange();
+  });
+  typeLabel.appendChild(typeSelect);
+  controls.appendChild(typeLabel);
+
+  const sizeLabel = document.createElement("label");
+  sizeLabel.className = "path-toolbar-field";
+  sizeLabel.textContent = "Tile Size";
+  const sizeRange = document.createElement("input");
+  sizeRange.type = "range";
+  sizeRange.min = "1";
+  sizeRange.max = "10";
+  sizeRange.step = "1";
+  sizeRange.value = String(state.tileSize);
+  const sizeValue = document.createElement("span");
+  sizeValue.className = "path-size-value";
+  sizeValue.textContent = `${state.tileSize}m`;
+  sizeRange.addEventListener("input", () => {
+    state.tileSize = Number(sizeRange.value);
+    sizeValue.textContent = `${state.tileSize}m`;
+    callbacks.onSizeChange();
+  });
+  sizeLabel.appendChild(sizeRange);
+  sizeLabel.appendChild(sizeValue);
+  controls.appendChild(sizeLabel);
+
+  const snapLabel = document.createElement("label");
+  snapLabel.className = "path-toolbar-field path-check";
+  const snapToggle = document.createElement("input");
+  snapToggle.type = "checkbox";
+  snapToggle.checked = state.snap;
+  snapToggle.addEventListener("change", () => {
+    state.snap = snapToggle.checked;
+  });
+  const snapText = document.createElement("span");
+  snapText.textContent = "Grid Snap";
+  snapLabel.appendChild(snapToggle);
+  snapLabel.appendChild(snapText);
+  controls.appendChild(snapLabel);
+
+  const clearButton = document.createElement("button");
+  clearButton.type = "button";
+  clearButton.className = "path-clear";
+  clearButton.textContent = "Clear Paths";
+  clearButton.addEventListener("click", callbacks.onClear);
+  controls.appendChild(clearButton);
+
+  toolbar.appendChild(controls);
+  return toolbar;
+}
+
 function makeHeightSampler(land) {
   const positions = land.geometry.attributes.position;
   const { width, height, widthSegments, heightSegments } =
