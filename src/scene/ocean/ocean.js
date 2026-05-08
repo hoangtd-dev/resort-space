@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 export function createOcean() {
-  const geo = new THREE.PlaneGeometry(600, 600);
+  const geo = new THREE.PlaneGeometry(1200, 1200);
   const mat = new THREE.MeshStandardMaterial({
     color: 0x40b8e8,
     roughness: 0.4,

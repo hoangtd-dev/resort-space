@@ -8,6 +8,7 @@ import { createGrid } from "./grid/grid";
 export function createScene() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.FogExp2(0x87ceeb, 0.003);
 
   scene.add(createOcean());
   scene.add(createLand());
