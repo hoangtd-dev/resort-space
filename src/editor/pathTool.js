@@ -42,6 +42,21 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight }) {
     placementLayer.clear();
   }
 
+  function removeTilesOutOfRange(halfSize) {
+    const toRemove = [];
+    for (const child of placementLayer.children) {
+      if (Math.abs(child.position.x) > halfSize || Math.abs(child.position.z) > halfSize) {
+        toRemove.push(child);
+      }
+    }
+    for (const child of toRemove) {
+      (child.userData.cellKeys || []).forEach((k) => occupiedCells.delete(k));
+      child.geometry.dispose();
+      child.material.dispose();
+      placementLayer.remove(child);
+    }
+  }
+
   function placeTile(worldX, worldZ) {
     const { x, z } = toPlacementPoint(worldX, worldZ);
     const keys = getCoveredCellKeys(x, z, 1, 1);
@@ -80,6 +95,7 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight }) {
     pathState,
     placeTile,
     clearTiles,
+    removeTilesOutOfRange,
     refreshPreviewMaterial,
     updatePreview,
     preview,

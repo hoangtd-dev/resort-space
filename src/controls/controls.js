@@ -9,7 +9,7 @@ export function createControls(camera, domElement) {
   controls.minDistance = 5;
   controls.maxDistance = 200;
 
-  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.maxPolarAngle = Math.PI / 2 - 0.25;
 
   controls.target.set(0, 0, 0);
   controls.update();

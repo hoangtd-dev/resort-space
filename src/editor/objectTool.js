@@ -119,6 +119,22 @@ export function createObjectTool({
     objectLayer.clear();
   }
 
+  function removeObjectsOutOfRange(halfSize) {
+    const toRemove = [];
+    for (const child of objectLayer.children) {
+      if (Math.abs(child.position.x) > halfSize || Math.abs(child.position.z) > halfSize) {
+        toRemove.push(child);
+      }
+    }
+    for (const child of toRemove) {
+      (child.userData.cellKeys || []).forEach((k) => occupiedCells.delete(k));
+      child.traverse((node) => {
+        if (node.isMesh) node.geometry.dispose();
+      });
+      objectLayer.remove(child);
+    }
+  }
+
   function placeObject(worldX, worldZ) {
     const config = OBJECT_CONFIGS[objectState.objectType];
     const entry = loadModel(config);
@@ -178,6 +194,7 @@ export function createObjectTool({
     placeObject,
     placeObjectOfType,
     clearObjects,
+    removeObjectsOutOfRange,
     refreshFootprint,
     updatePreview,
     preview: footprintPreview,
