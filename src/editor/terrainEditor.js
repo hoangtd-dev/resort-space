@@ -20,7 +20,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   const occupiedCells = new Set();
 
   // Unified placement mode
-  const placementState = { active: false, mode: "path" };
+  const placementState = { active: true, mode: "path", action: "place" };
 
   // Tools
   const hillTool = createHillTool({
@@ -33,7 +33,12 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     onReset: resetTerrain,
   });
 
-  const pathTool = createPathTool({ scene, occupiedCells, getSampleHeight });
+  const pathTool = createPathTool({
+    scene,
+    occupiedCells,
+    getSampleHeight,
+    getHalfSize: () => land.geometry.parameters.width / 2,
+  });
   const objectTool = createObjectTool({
     scene,
     land,
@@ -71,6 +76,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   const lastHitWorld = new THREE.Vector3();
   let pointerOnCanvas = false;
   let hasHit = false;
+  let isPointerDown = false;
 
   const canvas = renderer.domElement;
 
@@ -88,15 +94,26 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   });
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !hasHit) return;
+    isPointerDown = true;
     // Hill tool captures shift+LMB via its own listener (capture phase).
     // Only handle placement if hill tool is not painting.
     if (hillTool.isActive() && hillTool.isShiftHeld()) return;
     if (placementState.active) {
-      if (placementState.mode === "object")
+      if (placementState.mode === "path") pathTool.beginStroke();
+      if (placementState.action === "delete") {
+        deleteAtPointer();
+      } else if (placementState.mode === "object") {
         objectTool.placeObject(lastHitWorld.x, lastHitWorld.z);
-      else pathTool.placeTile(lastHitWorld.x, lastHitWorld.z);
+      } else {
+        pathTool.setPathAt(lastHitWorld.x, lastHitWorld.z);
+      }
       e.preventDefault();
     }
+  });
+  window.addEventListener("pointerup", () => {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+    pathTool.endStroke();
   });
 
   const clock = new THREE.Clock();
@@ -110,6 +127,21 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   function clearAll() {
     pathTool.clearTiles();
     objectTool.clearObjects();
+  }
+
+  function deleteAtPointer() {
+    if (placementState.mode === "path") {
+      pathTool.removePathAt(lastHitWorld.x, lastHitWorld.z);
+      return;
+    }
+
+    const objectHits = raycaster.intersectObjects(
+      objectTool.objectLayer.children,
+      true,
+    );
+    const objectHit = objectHits[0];
+    if (!objectHit) return;
+    objectTool.removeByHitObject(objectHit.object);
   }
 
   function resizeLand(newSize) {
@@ -163,14 +195,12 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   }
 
   function initDefaultLayout() {
-    for (const [wx, wz] of DEFAULT_PATHS) {
-      const saved = pathTool.pathState.pathType;
-      pathTool.pathState.pathType = "stone";
-      pathTool.placeTile(wx, wz);
-      pathTool.pathState.pathType = saved;
-    }
+    // Objects first so their footprints block any conflicting path tiles.
     for (const { type, wx, wz } of DEFAULT_OBJECTS) {
       objectTool.placeObjectOfType(type, wx, wz);
+    }
+    for (const { wx, wz, type } of DEFAULT_PATHS) {
+      pathTool.setPathAt(wx, wz, type);
     }
   }
 
@@ -188,6 +218,20 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     pathTool.updatePreview({ hasHit, lastHitWorld, placementState });
     objectTool.updatePreview({ hasHit, lastHitWorld, placementState });
     hillTool.update(dt, { hasHit, lastHitWorld });
+
+    if (
+      isPointerDown &&
+      hasHit &&
+      placementState.active &&
+      placementState.mode === "path" &&
+      !(hillTool.isActive() && hillTool.isShiftHeld())
+    ) {
+      if (placementState.action === "delete") {
+        pathTool.removePathAt(lastHitWorld.x, lastHitWorld.z);
+      } else {
+        pathTool.setPathAt(lastHitWorld.x, lastHitWorld.z);
+      }
+    }
   }
 
   return { update };

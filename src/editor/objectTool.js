@@ -163,7 +163,12 @@ export function createObjectTool({
   }
 
   function updatePreview({ hasHit, lastHitWorld, placementState }) {
-    if (!placementState.active || placementState.mode !== "object" || !hasHit) {
+    if (
+      !placementState.active ||
+      placementState.action === "delete" ||
+      placementState.mode !== "object" ||
+      !hasHit
+    ) {
       footprintPreview.visible = false;
       return;
     }
@@ -186,6 +191,23 @@ export function createObjectTool({
     footprintPreview.visible = true;
   }
 
+  function removeByHitObject(hitObject) {
+    const root = findPlacementRoot(hitObject);
+    if (!root) return false;
+    (root.userData.cellKeys || []).forEach((k) => occupiedCells.delete(k));
+    root.traverse((node) => {
+      if (node.isMesh) node.geometry?.dispose?.();
+    });
+    objectLayer.remove(root);
+    return true;
+  }
+
+  function findPlacementRoot(obj) {
+    let cur = obj;
+    while (cur && cur.parent && cur.parent !== objectLayer) cur = cur.parent;
+    return cur && cur.parent === objectLayer ? cur : null;
+  }
+
   // Kick off load for the default object type
   loadModel(OBJECT_CONFIGS[objectState.objectType]);
 
@@ -196,8 +218,10 @@ export function createObjectTool({
     clearObjects,
     removeObjectsOutOfRange,
     refreshFootprint,
+    removeByHitObject,
     updatePreview,
     preview: footprintPreview,
+    objectLayer,
   };
 }
 
