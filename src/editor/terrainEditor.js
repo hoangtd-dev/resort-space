@@ -113,13 +113,25 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   }
 
   function resizeLand(newSize) {
-    land.geometry.dispose();
-    land.geometry = new THREE.PlaneGeometry(
+    const gridWasVisible = gridHelper ? gridHelper.visible : false;
+
+    const oldSample = sampleHeight;
+    const newGeom = new THREE.PlaneGeometry(
       newSize,
       newSize,
       newSize * 2,
       newSize * 2,
     );
+    const newPos = newGeom.attributes.position;
+    for (let i = 0; i < newPos.count; i++) {
+      const h = oldSample(newPos.getX(i), -newPos.getY(i));
+      if (h !== 0) newPos.setZ(i, h);
+    }
+    newPos.needsUpdate = true;
+    newGeom.computeVertexNormals();
+
+    land.geometry.dispose();
+    land.geometry = newGeom;
     sampleHeight = makeHeightSampler(land);
 
     const divisions = Math.round((newSize * 2) / GRID_CELL_SIZE);
@@ -141,10 +153,13 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     gridHelper.material.depthWrite = false;
     gridHelper.renderOrder = 999;
     gridHelper.position.y = 0.06;
+    gridHelper.visible = gridWasVisible;
     scene.add(gridHelper);
 
-    clearAll();
-    occupiedCells.clear();
+    // Remove only items that now fall outside the new land bounds.
+    const half = newSize / 2;
+    pathTool.removeTilesOutOfRange(half);
+    objectTool.removeObjectsOutOfRange(half);
   }
 
   function initDefaultLayout() {
