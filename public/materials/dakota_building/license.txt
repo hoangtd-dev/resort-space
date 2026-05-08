@@ -1,0 +1,11 @@
+Model Information:
+* title:	Stylized Dakota Building
+* source:	https://sketchfab.com/3d-models/stylized-dakota-building-0c770e8c05b540a894b9d563018b0bf9
+* author:	Cristian Rangel (https://sketchfab.com/Shinco)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Stylized Dakota Building" (https://sketchfab.com/3d-models/stylized-dakota-building-0c770e8c05b540a894b9d563018b0bf9) by Cristian Rangel (https://sketchfab.com/Shinco) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
