@@ -1,6 +1,7 @@
 export const OBJECT_CONFIGS = {
   oak_tree: {
     label: "Oak Tree",
+    category: "tree",
     path: "/materials/oak_trees/scene.gltf",
     thumb: "/materials/oak_trees/textures/bark1_baseColor.png",
     cols: 1,
@@ -8,6 +9,7 @@ export const OBJECT_CONFIGS = {
   },
   stylized_tree: {
     label: "Stylized Tree",
+    category: "tree",
     path: "/materials/stylized_tree/scene.gltf",
     thumb: "/materials/stylized_tree/textures/leafes_Mat.001_baseColor.png",
     cols: 1,
@@ -15,6 +17,7 @@ export const OBJECT_CONFIGS = {
   },
   asia_building: {
     label: "Asia Building",
+    category: "building",
     path: "/materials/asia_building/scene.gltf",
     thumb: "/materials/asia_building/textures/build_01_baseColor.jpeg",
     cols: 2,
@@ -22,6 +25,7 @@ export const OBJECT_CONFIGS = {
   },
   dakota_building: {
     label: "Dakota Building",
+    category: "building",
     path: "/materials/dakota_building/scene.gltf",
     thumb: "/materials/asia_building/textures/concrete_baseColor.jpeg",
     cols: 2,
@@ -29,6 +33,7 @@ export const OBJECT_CONFIGS = {
   },
   resort: {
     label: "Resort Villa",
+    category: "building",
     path: "/materials/resort/scene.gltf",
     thumb: "/materials/resort/textures/porte_010___d_baseColor.jpeg",
     cols: 4,
@@ -36,6 +41,7 @@ export const OBJECT_CONFIGS = {
   },
   blue_radison_resort: {
     label: "Blue Radison Resort",
+    category: "building",
     path: "/materials/the_blue_radison_resort/scene.gltf",
     thumb:
       "/materials/the_blue_radison_resort/textures/brique_012_Wall_Entity_Material_baseColor.jpeg",

@@ -1,10 +1,11 @@
 import * as THREE from "three";
 
 import { GRID_CELL_SIZE } from "./snapGrid";
-import { createHillTool } from "./hillTool";
+import { createHillTool, HILL_TOOL_OFF } from "./hillTool";
+import { createHillToolPalette } from "./hillToolPalette";
 import { createPathTool } from "./pathTool";
 import { createObjectTool } from "./objectTool";
-import { createPlacementToolbar } from "./placementToolbar";
+import { createPlacementToolPalette } from "./placementToolPalette";
 import { applyDefaultTerrain } from "../scene/land/defaultTerrain";
 import { DEFAULT_PATHS, DEFAULT_OBJECTS } from "../scene/land/defaultLayout";
 
@@ -19,8 +20,11 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   // Shared occupancy grid — passed by reference to all tools
   const occupiedCells = new Set();
 
-  // Unified placement mode
-  const placementState = { active: true, mode: "path", action: "place" };
+  // Unified placement mode (driven by bubble palette — disabled until armed)
+  const placementState = { active: false, mode: "path", action: "place" };
+
+  // Forward refs for cross-tool exclusivity (palette deactivates hill etc.)
+  let placementPalette;
 
   // Tools
   const hillTool = createHillTool({
@@ -30,7 +34,13 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     controls,
     renderer,
     getSampleHeight,
-    onReset: resetTerrain,
+    onActivate: () => placementPalette?.deactivate(),
+  });
+
+  const hillPalette = createHillToolPalette({
+    state: hillTool.state,
+    setActiveTool: hillTool.setActiveTool,
+    setOnActiveToolChange: hillTool.setOnActiveToolChange,
   });
 
   const pathTool = createPathTool({
@@ -46,26 +56,26 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     getSampleHeight,
   });
 
-  // Grid helper
+  placementPalette = createPlacementToolPalette({
+    controls,
+    pathState: pathTool.pathState,
+    objectState: objectTool.objectState,
+    placementState,
+    onPathTypeChange: () => pathTool.refreshPreviewMaterial(),
+    onObjectTypeChange: () => objectTool.refreshFootprint(),
+    onActivate: () => hillTool.setActiveTool(HILL_TOOL_OFF),
+  });
+
+  // Grid helper (kept for future re-wiring; not currently surfaced in UI)
   let gridHelper = scene.getObjectByName("grid");
   if (gridHelper) gridHelper.visible = false;
 
-  // Toolbar
-  const toolbar = createPlacementToolbar(
-    pathTool.pathState,
-    objectTool.objectState,
-    placementState,
-    {
-      onPathTypeChange: () => pathTool.refreshPreviewMaterial(),
-      onObjectTypeChange: () => objectTool.refreshFootprint(),
-      onClearAll: clearAll,
-      onGridToggle: (visible) => {
-        if (gridHelper) gridHelper.visible = visible;
-      },
-      onLandResize: (size) => resizeLand(size),
-    },
-  );
-  document.body.appendChild(toolbar);
+  // Bottom-left palette row: placement + hill bubbles on a single line.
+  const bottomLeftStack = document.createElement("div");
+  bottomLeftStack.className = "bottom-left-stack";
+  bottomLeftStack.appendChild(placementPalette.element);
+  bottomLeftStack.appendChild(hillPalette.element);
+  document.body.appendChild(bottomLeftStack);
 
   // Default layout
   initDefaultLayout();
@@ -95,9 +105,9 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !hasHit) return;
     isPointerDown = true;
-    // Hill tool captures shift+LMB via its own listener (capture phase).
-    // Only handle placement if hill tool is not painting.
-    if (hillTool.isActive() && hillTool.isShiftHeld()) return;
+    // Hill tool captures LMB via its own listener (capture phase) when armed.
+    // Skip placement entirely while a hill tool is active.
+    if (hillTool.isActive()) return;
     if (placementState.active) {
       if (placementState.mode === "path") pathTool.beginStroke();
       if (placementState.action === "delete") {
@@ -224,7 +234,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
       hasHit &&
       placementState.active &&
       placementState.mode === "path" &&
-      !(hillTool.isActive() && hillTool.isShiftHeld())
+      !hillTool.isActive()
     ) {
       if (placementState.action === "delete") {
         pathTool.removePathAt(lastHitWorld.x, lastHitWorld.z);

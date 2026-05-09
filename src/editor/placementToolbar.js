@@ -1,6 +1,3 @@
-import * as THREE from "three";
-import { OBJECT_CONFIGS } from "./objectConfig";
-
 export const PATH_TYPES = {
   rock: {
     label: "Rock Path",
@@ -80,16 +77,6 @@ export function createPlacementToolbar(
   const controlsTop = document.createElement("div");
   controlsTop.className = "path-controls-top";
 
-  const enabledLabel = document.createElement("label");
-  enabledLabel.className = "path-toolbar-field";
-  enabledLabel.textContent = "Tool";
-  const enabledToggle = document.createElement("button");
-  enabledToggle.type = "button";
-  enabledToggle.className = "path-toggle active";
-  enabledToggle.textContent = "Enabled";
-  enabledLabel.appendChild(enabledToggle);
-  controlsTop.appendChild(enabledLabel);
-
   const modeWrap = document.createElement("div");
   modeWrap.className = "path-toolbar-field";
   modeWrap.textContent = "Mode";
@@ -148,114 +135,14 @@ export function createPlacementToolbar(
   utilityRow.appendChild(gridLabel);
 
   body.appendChild(utilityRow);
-
-  const paletteWrap = document.createElement("div");
-  paletteWrap.className = "path-palette-wrap";
-  const paletteTitle = document.createElement("div");
-  paletteTitle.className = "path-palette-title";
-  paletteTitle.textContent = "Assets";
-
-  const search = document.createElement("input");
-  search.type = "text";
-  search.placeholder = "Search assets...";
-  search.className = "path-search";
-
-  const palette = document.createElement("div");
-  palette.className = "path-palette";
-  const buttons = [];
-
-  const sections = [
-    {
-      heading: "Objects",
-      entries: Object.entries(OBJECT_CONFIGS).map(([key, value]) => ({
-        kind: "object", key, label: value.label, thumb: value.thumb ?? null, color: 0x5f9a57,
-      })),
-    },
-    {
-      heading: "Paths",
-      entries: Object.entries(PATH_TYPES).map(([key, value]) => ({
-        kind: "path", key, label: value.label, thumb: value.thumb, color: value.color,
-      })),
-    },
-  ];
-
-  for (const section of sections) {
-    const header = document.createElement("div");
-    header.className = "path-palette-section";
-    header.textContent = section.heading;
-    palette.appendChild(header);
-
-    for (const entry of section.entries) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "path-palette-btn";
-      btn.dataset.key = entry.key;
-      btn.dataset.kind = entry.kind;
-      btn.dataset.label = entry.label.toLowerCase();
-      btn.dataset.section = section.heading;
-      btn.style.borderColor = `${new THREE.Color(entry.color).getStyle()}`;
-
-      const thumb = document.createElement("span");
-      thumb.className = "path-palette-thumb";
-      if (entry.thumb) thumb.style.backgroundImage = `url(${entry.thumb})`;
-      const label = document.createElement("span");
-      label.className = "path-palette-label";
-      label.textContent = entry.label;
-      btn.appendChild(thumb);
-      btn.appendChild(label);
-
-      btn.addEventListener("click", () => {
-        placementState.mode = entry.kind;
-        if (entry.kind === "path") {
-          pathState.pathType = entry.key;
-          callbacks.onPathTypeChange();
-        } else {
-          objectState.objectType = entry.key;
-          callbacks.onObjectTypeChange();
-        }
-        for (const b of buttons) {
-          b.classList.toggle(
-            "active",
-            b.dataset.key === entry.key && b.dataset.kind === entry.kind,
-          );
-        }
-      });
-
-      buttons.push(btn);
-      palette.appendChild(btn);
-    }
-  }
-
-  search.addEventListener("input", () => {
-    const q = search.value.trim().toLowerCase();
-    for (const btn of buttons) {
-      btn.style.display = btn.dataset.label.includes(q) ? "" : "none";
-    }
-    // Hide a section header when every button in that section is hidden.
-    for (const header of palette.querySelectorAll(".path-palette-section")) {
-      const sectionBtns = buttons.filter(b => b.dataset.section === header.textContent);
-      header.style.display = sectionBtns.every(b => b.style.display === "none") ? "none" : "";
-    }
-  });
-
-  paletteWrap.appendChild(paletteTitle);
-  paletteWrap.appendChild(search);
-  paletteWrap.appendChild(palette);
-  body.appendChild(paletteWrap);
-
   toolbar.appendChild(body);
 
   function syncModeButtons() {
     placeBtn.classList.toggle("active", placementState.action === "place");
     deleteBtn.classList.toggle("active", placementState.action === "delete");
-    indicator.textContent = placementState.action === "delete" ? "Delete" : "Place";
+    indicator.textContent =
+      placementState.action === "delete" ? "Delete" : "Place";
   }
-
-  enabledToggle.addEventListener("click", () => {
-    placementState.active = !placementState.active;
-    enabledToggle.textContent = placementState.active ? "Enabled" : "Disabled";
-    enabledToggle.classList.toggle("active", placementState.active);
-  });
 
   placeBtn.addEventListener("click", () => {
     placementState.action = "place";
@@ -267,8 +154,6 @@ export function createPlacementToolbar(
     syncModeButtons();
   });
 
-  const initial = buttons.find((b) => b.dataset.kind === "path" && b.dataset.key === pathState.pathType);
-  if (initial) initial.classList.add("active");
   syncModeButtons();
 
   return toolbar;
