@@ -1,10 +1,12 @@
 import * as THREE from "three";
 import { OBJECT_CONFIGS } from "./objectConfig";
 import { PATH_TYPES } from "./placementToolbar";
+import { generateThumbnail } from "../utils/thumbnailGenerator";
 
 const PLACEMENT_OFF = "off";
 const PLACEMENT_BUILDINGS = "buildings";
 const PLACEMENT_TREES = "trees";
+const PLACEMENT_PROPS = "props";
 const PLACEMENT_PATH = "path";
 const PLACEMENT_SPRAY = "spray";
 const PLACEMENT_CONCRETE = "concrete";
@@ -28,6 +30,9 @@ export function createPlacementToolPalette({
   const trees = Object.entries(OBJECT_CONFIGS)
     .filter(([, c]) => c.category === "tree")
     .map(([key, c]) => ({ key, label: c.label, thumb: c.thumb }));
+  const props = Object.entries(OBJECT_CONFIGS)
+    .filter(([, c]) => c.category === "prop")
+    .map(([key, c]) => ({ key, label: c.label, thumb: c.thumb }));
   const paths = Object.entries(PATH_TYPES).map(([key, c]) => ({
     key,
     label: c.label,
@@ -49,6 +54,13 @@ export function createPlacementToolPalette({
       label: "Trees",
       icon: treesIcon(),
       assets: trees,
+      mode: "object",
+    },
+    {
+      id: PLACEMENT_PROPS,
+      label: "Props",
+      icon: propsIcon(),
+      assets: props,
       mode: "object",
     },
     {
@@ -246,6 +258,17 @@ function popoverHTML(tool, selectedKey) {
 function wirePopover(popover, selectAsset) {
   for (const btn of popover.querySelectorAll(".placement-thumb")) {
     btn.addEventListener("click", () => selectAsset(btn.dataset.key));
+
+    // Auto-generate preview for assets that have no static thumbnail
+    const img = btn.querySelector(".placement-thumb-img");
+    if (img && !img.style.backgroundImage) {
+      const config = OBJECT_CONFIGS[btn.dataset.key];
+      if (config?.path) {
+        generateThumbnail(config.path).then((url) => {
+          if (url) img.style.backgroundImage = `url(${url})`;
+        });
+      }
+    }
   }
 }
 
@@ -287,6 +310,15 @@ function concreteIcon() {
     <circle cx="12" cy="14" r="2" fill="currentColor"/>
     <circle cx="18" cy="18" r="2" fill="currentColor"/>
     <circle cx="28" cy="6" r="2" fill="currentColor"/>
+  </svg>`;
+}
+
+function propsIcon() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2.5" opacity="0.55"/>
+    <path d="M16 7 A9 9 0 0 1 25 16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="16" cy="16" r="2.5" fill="currentColor"/>
+    <path d="M10 10 L13 13 M22 10 L19 13 M10 22 L13 19 M22 22 L19 19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
   </svg>`;
 }
 

@@ -23,6 +23,13 @@ export const OBJECT_CONFIGS = {
     cols: 1,
     rows: 1,
   },
+  palm_tree: {
+    label: "Palm Tree",
+    category: "tree",
+    path: "/models/Palm tree.glb",
+    cols: 1,
+    rows: 1,
+  },
   asia_building: {
     label: "Watchtower",
     category: "building",
@@ -70,5 +77,63 @@ export const OBJECT_CONFIGS = {
     thumb: "/kenney_pirate-kit/Previews/castle-gate.png",
     cols: 2,
     rows: 2,
+  },
+  bungalow: {
+    label: "Bungalow",
+    category: "building",
+    path: "/models/Bungalow.glb",
+    cols: 3,
+    rows: 3,
+  },
+  cottage: {
+    label: "Cottage",
+    category: "building",
+    path: "/models/Cottage.glb",
+    cols: 3,
+    rows: 3,
+  },
+  house: {
+    label: "House",
+    category: "building",
+    path: "/models/House.glb",
+    cols: 3,
+    rows: 3,
+  },
+  villa: {
+    label: "Villa",
+    category: "building",
+    path: "/models/Villa.glb",
+    cols: 4,
+    rows: 4,
+  },
+
+  // Props / decorations
+  crab: {
+    label: "Crab",
+    category: "prop",
+    path: "/models/Crab.glb",
+    cols: 1,
+    rows: 1,
+  },
+  flamingo: {
+    label: "Flamingo",
+    category: "prop",
+    path: "/models/Flamingo.glb",
+    cols: 1,
+    rows: 1,
+  },
+  seagull: {
+    label: "Seagull",
+    category: "prop",
+    path: "/models/Seagull.glb",
+    cols: 1,
+    rows: 1,
+  },
+  beach_ball: {
+    label: "Beach Ball",
+    category: "prop",
+    path: "/models/beach ball.glb",
+    cols: 1,
+    rows: 1,
   },
 };

@@ -21,6 +21,63 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
   let strokeVisited = null;
   let lastStrokeCell = null;
 
+  // ── GLB tile system for "rock" path type ─────────────────────────────────
+  const glbTiles = { loaded: false, meshDefs: [], instances: [] };
+
+  function initGLBTiles() {
+    new GLTFLoader().load("/models/Path.glb", (gltf) => {
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.z) || 1;
+      const sf = GRID_CELL_SIZE / maxDim;
+      const cx = (box.min.x + box.max.x) / 2;
+      const cz = (box.min.z + box.max.z) / 2;
+
+      gltf.scene.traverse((child) => {
+        if (!child.isMesh) return;
+        const geo = child.geometry.clone();
+        // Centre-bottom the geometry so (0,0,0) = centre of tile at ground
+        geo.applyMatrix4(new THREE.Matrix4().makeTranslation(-cx, -box.min.y, -cz));
+        geo.applyMatrix4(new THREE.Matrix4().makeScale(sf, sf, sf));
+        glbTiles.meshDefs.push({ geo, mat: child.material });
+      });
+      glbTiles.loaded = true;
+      rebuildGLBTiles();
+    });
+  }
+
+  function rebuildGLBTiles() {
+    for (const im of glbTiles.instances) placementLayer.remove(im);
+    glbTiles.instances = [];
+    if (!glbTiles.loaded) return;
+
+    const rockPositions = [];
+    for (const [cellKey, type] of pathCells) {
+      if (type === "rock") rockPositions.push(worldFromCellKey(cellKey));
+    }
+    if (rockPositions.length === 0) return;
+
+    const sampler = getSampleHeight();
+    const dummy = new THREE.Object3D();
+
+    for (const { geo, mat } of glbTiles.meshDefs) {
+      const im = new THREE.InstancedMesh(geo, mat, rockPositions.length);
+      im.receiveShadow = true;
+      im.castShadow = true;
+      for (let idx = 0; idx < rockPositions.length; idx++) {
+        const { x, z } = rockPositions[idx];
+        dummy.position.set(x, sampler(x, z) + PLACED_OFFSET, z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        im.setMatrixAt(idx, dummy.matrix);
+      }
+      im.instanceMatrix.needsUpdate = true;
+      placementLayer.add(im);
+      glbTiles.instances.push(im);
+    }
+  }
+
   const preview = new THREE.Mesh(
     createPreviewGeometry(),
     createTileMaterial(pathState.pathType, { preview: true }),
@@ -87,6 +144,8 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
     }
     chunkStore.clear();
     dirtyChunks.clear();
+    for (const im of glbTiles.instances) placementLayer.remove(im);
+    glbTiles.instances = [];
   }
 
   function removeTilesOutOfRange(halfSize) {
@@ -156,6 +215,7 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
   function rebuildDirtyChunks() {
     for (const key of dirtyChunks) rebuildChunk(key);
     dirtyChunks.clear();
+    rebuildGLBTiles();
   }
 
   function rebuildChunk(chunkKey) {
@@ -181,6 +241,7 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
   }
 
   function buildChunkGeometry(ci, cj, type) {
+    if (type === "rock") return null; // handled by GLB instanced tiles
     const iStart = ci * CHUNK_CELLS, jStart = cj * CHUNK_CELLS;
 
     let hasAny = false;
@@ -268,6 +329,8 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
     markCellAndNeighborsDirty(i, j);
     return true;
   }
+
+  initGLBTiles();
 
   return {
     pathState, placeTile, setPathAt, removePathAt,
@@ -384,9 +447,7 @@ function getPathTexture(type) {
   let texture = null;
   const repeat = [1.5, 1.5];
 
-  if (type === "rock") {
-    texture = loadGLBTexture("/textures/paths/rock_path_round_wide.glb", buildStonePlaceholder);
-  } else if (type === "sand") {
+  if (type === "sand") {
     texture = loadGLBTexture("/textures/paths/beach_sand_path.glb", buildSandTexture);
   } else if (type === "grass") {
     texture = buildGrassTexture();
