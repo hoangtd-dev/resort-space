@@ -30,6 +30,160 @@ function smoothstep01(t) {
   return t * t * (3 - 2 * t);
 }
 
+// Compute the rectangular vertex-index range covering the brush footprint in a
+// regular PlaneGeometry. Three.js plane vertices are pushed with localY = -y,
+// so iy=0 is at +halfH and iy=heightSegments is at -halfH.
+function brushIndexRange(geometry, hitLocal, size) {
+  const { width, height, widthSegments, heightSegments } = geometry.parameters;
+  const cw = width / widthSegments;
+  const ch = height / heightSegments;
+  const halfW = width / 2;
+  const halfH = height / 2;
+
+  const ixMin = Math.max(0, Math.floor((hitLocal.x - size + halfW) / cw));
+  const ixMax = Math.min(widthSegments, Math.ceil((hitLocal.x + size + halfW) / cw));
+  const iyMin = Math.max(0, Math.floor((halfH - hitLocal.y - size) / ch));
+  const iyMax = Math.min(heightSegments, Math.ceil((halfH - hitLocal.y + size) / ch));
+  const cols = widthSegments + 1;
+  return { ixMin, ixMax, iyMin, iyMax, cols, widthSegments, heightSegments };
+}
+
+// Recompute vertex normals for a rectangular vertex range, plus a 1-vertex
+// halo (perimeter normals depend on triangles outside the range, since one of
+// the triangle's verts moved).
+//
+// For a regular grid plane, each interior vertex has 6 incident triangles
+// (4 surrounding cells × ~1.5 tri/cell), so per-vertex cost is constant.
+function recomputeNormalsInRange(geometry, ixMin, ixMax, iyMin, iyMax) {
+  const positions = geometry.attributes.position;
+  const normals = geometry.attributes.normal;
+  if (!normals) {
+    geometry.computeVertexNormals();
+    return;
+  }
+  const { widthSegments, heightSegments } = geometry.parameters;
+  const cols = widthSegments + 1;
+
+  const vxMin = Math.max(0, ixMin - 1);
+  const vxMax = Math.min(widthSegments, ixMax + 1);
+  const vyMin = Math.max(0, iyMin - 1);
+  const vyMax = Math.min(heightSegments, iyMax + 1);
+
+  for (let vy = vyMin; vy <= vyMax; vy++) {
+    for (let vx = vxMin; vx <= vxMax; vx++) {
+      recomputeOneNormal(
+        positions,
+        normals,
+        vx,
+        vy,
+        widthSegments,
+        heightSegments,
+        cols,
+      );
+    }
+  }
+
+  normals.needsUpdate = true;
+}
+
+const _accum = { x: 0, y: 0, z: 0 };
+
+function addTriNormal(positions, ia, ib, ic) {
+  const ax = positions.getX(ia),
+    ay = positions.getY(ia),
+    az = positions.getZ(ia);
+  const bx = positions.getX(ib),
+    by = positions.getY(ib),
+    bz = positions.getZ(ib);
+  const cx = positions.getX(ic),
+    cy = positions.getY(ic),
+    cz = positions.getZ(ic);
+  const ux = bx - ax,
+    uy = by - ay,
+    uz = bz - az;
+  const vx = cx - ax,
+    vy = cy - ay,
+    vz = cz - az;
+  // Area-weighted face normal (un-normalized cross product).
+  _accum.x += uy * vz - uz * vy;
+  _accum.y += uz * vx - ux * vz;
+  _accum.z += ux * vy - uy * vx;
+}
+
+function recomputeOneNormal(positions, normals, vx, vy, widthSegs, heightSegs, cols) {
+  _accum.x = 0;
+  _accum.y = 0;
+  _accum.z = 0;
+
+  // Each vertex (vx, vy) is incident to up to 6 triangles across 4 cells.
+  // PlaneGeometry triangulation per cell (cx, cy) — corners
+  //   a=(cx, cy), b=(cx, cy+1), c=(cx+1, cy+1), d=(cx+1, cy)
+  // T1=(a,b,d), T2=(b,c,d).
+
+  // Cell (vx-1, vy-1) T2: (vx-1, vy), (vx, vy), (vx, vy-1)
+  if (vx > 0 && vy > 0) {
+    addTriNormal(
+      positions,
+      vy * cols + (vx - 1),
+      vy * cols + vx,
+      (vy - 1) * cols + vx,
+    );
+  }
+  // Cell (vx, vy-1) T1: (vx, vy-1), (vx, vy), (vx+1, vy-1)
+  if (vx < widthSegs && vy > 0) {
+    addTriNormal(
+      positions,
+      (vy - 1) * cols + vx,
+      vy * cols + vx,
+      (vy - 1) * cols + (vx + 1),
+    );
+  }
+  // Cell (vx, vy-1) T2: (vx, vy), (vx+1, vy), (vx+1, vy-1)
+  if (vx < widthSegs && vy > 0) {
+    addTriNormal(
+      positions,
+      vy * cols + vx,
+      vy * cols + (vx + 1),
+      (vy - 1) * cols + (vx + 1),
+    );
+  }
+  // Cell (vx-1, vy) T1: (vx-1, vy), (vx-1, vy+1), (vx, vy)
+  if (vx > 0 && vy < heightSegs) {
+    addTriNormal(
+      positions,
+      vy * cols + (vx - 1),
+      (vy + 1) * cols + (vx - 1),
+      vy * cols + vx,
+    );
+  }
+  // Cell (vx-1, vy) T2: (vx-1, vy+1), (vx, vy+1), (vx, vy)
+  if (vx > 0 && vy < heightSegs) {
+    addTriNormal(
+      positions,
+      (vy + 1) * cols + (vx - 1),
+      (vy + 1) * cols + vx,
+      vy * cols + vx,
+    );
+  }
+  // Cell (vx, vy) T1: (vx, vy), (vx, vy+1), (vx+1, vy)
+  if (vx < widthSegs && vy < heightSegs) {
+    addTriNormal(
+      positions,
+      vy * cols + vx,
+      (vy + 1) * cols + vx,
+      vy * cols + (vx + 1),
+    );
+  }
+
+  const len = Math.hypot(_accum.x, _accum.y, _accum.z);
+  const i = vy * cols + vx;
+  if (len > 0) {
+    normals.setXYZ(i, _accum.x / len, _accum.y / len, _accum.z / len);
+  } else {
+    normals.setXYZ(i, 0, 0, 1);
+  }
+}
+
 // Naive lift / lower: every vertex inside the brush moves by direction*strength*falloff*dt.
 // No memory of neighbouring heights — repainting amplifies existing bumps.
 //
@@ -40,20 +194,27 @@ export function applyCircleBrush(geometry, hitLocal, params) {
   const { size, hardness, strength, direction, dt } = params;
   const positions = geometry.attributes.position;
   const sizeSq = size * size;
+  const { ixMin, ixMax, iyMin, iyMax, cols } = brushIndexRange(
+    geometry,
+    hitLocal,
+    size,
+  );
 
-  for (let i = 0; i < positions.count; i++) {
-    const dx = positions.getX(i) - hitLocal.x;
-    const dy = positions.getY(i) - hitLocal.y;
-    const distSq = dx * dx + dy * dy;
-    if (distSq >= sizeSq) continue;
-
-    const f = falloff(Math.sqrt(distSq), size, hardness);
-    const delta = direction * strength * f * dt;
-    positions.setZ(i, clampHeight(positions.getZ(i) + delta));
+  for (let iy = iyMin; iy <= iyMax; iy++) {
+    for (let ix = ixMin; ix <= ixMax; ix++) {
+      const i = iy * cols + ix;
+      const dx = positions.getX(i) - hitLocal.x;
+      const dy = positions.getY(i) - hitLocal.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= sizeSq) continue;
+      const f = falloff(Math.sqrt(distSq), size, hardness);
+      const delta = direction * strength * f * dt;
+      positions.setZ(i, clampHeight(positions.getZ(i) + delta));
+    }
   }
 
   positions.needsUpdate = true;
-  geometry.computeVertexNormals();
+  recomputeNormalsInRange(geometry, ixMin, ixMax, iyMin, iyMax);
 }
 
 // Level-then-lift (Planet Zoo-style). Two phases per frame:
@@ -98,23 +259,26 @@ export function applyCircleBrushLiftSmooth(geometry, hitLocal, params) {
   const step = direction * strength * dt;
   const smoothStep = Math.min(smoothness * dt, 1);
 
-  const { widthSegments, heightSegments } = geometry.parameters;
-  const cols = widthSegments + 1;
+  const { ixMin, ixMax, iyMin, iyMax, cols, widthSegments, heightSegments } =
+    brushIndexRange(geometry, hitLocal, size);
   const rows = heightSegments + 1;
 
   // Pass 1: lift, also collect brush membership for the smoothing pass.
   const inBrush = [];
-  for (let i = 0; i < positions.count; i++) {
-    const dx = positions.getX(i) - hitLocal.x;
-    const dy = positions.getY(i) - hitLocal.y;
-    const distSq = dx * dx + dy * dy;
-    if (distSq >= sizeSq) continue;
+  for (let iy = iyMin; iy <= iyMax; iy++) {
+    for (let ix = ixMin; ix <= ixMax; ix++) {
+      const i = iy * cols + ix;
+      const dx = positions.getX(i) - hitLocal.x;
+      const dy = positions.getY(i) - hitLocal.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= sizeSq) continue;
 
-    const f = falloff(Math.sqrt(distSq), size, hardness);
-    const z = positions.getZ(i);
-    positions.setZ(i, clampHeight(z + step * f));
+      const f = falloff(Math.sqrt(distSq), size, hardness);
+      const z = positions.getZ(i);
+      positions.setZ(i, clampHeight(z + step * f));
 
-    inBrush.push({ i, ix: i % cols, iy: Math.floor(i / cols) });
+      inBrush.push({ i, ix, iy });
+    }
   }
 
   // Pass 2: smooth toward neighbor avg. Read positions, compute new values,
@@ -149,8 +313,7 @@ export function applyCircleBrushLiftSmooth(geometry, hitLocal, params) {
   }
 
   positions.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
+  recomputeNormalsInRange(geometry, ixMin, ixMax, iyMin, iyMax);
 }
 
 // Phase-1-only variant of level-mode. Off-extreme core verts catch up toward
@@ -174,18 +337,27 @@ function applyLevelOnly(geometry, hitLocal, params, direction) {
   const step = strength * dt;
   const signedLevelStep = step * levelSpeed * direction;
 
+  const { ixMin, ixMax, iyMin, iyMax, cols } = brushIndexRange(
+    geometry,
+    hitLocal,
+    size,
+  );
+
   const inCore = [];
   let coreExtreme = -Infinity * direction;
 
-  for (let i = 0; i < positions.count; i++) {
-    const dx = positions.getX(i) - hitLocal.x;
-    const dy = positions.getY(i) - hitLocal.y;
-    const distSq = dx * dx + dy * dy;
-    if (distSq >= sizeSq) continue;
-    if (distSq <= innerSq) {
-      const z = positions.getZ(i);
-      if (direction * z > direction * coreExtreme) coreExtreme = z;
-      inCore.push(i);
+  for (let iy = iyMin; iy <= iyMax; iy++) {
+    for (let ix = ixMin; ix <= ixMax; ix++) {
+      const i = iy * cols + ix;
+      const dx = positions.getX(i) - hitLocal.x;
+      const dy = positions.getY(i) - hitLocal.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= sizeSq) continue;
+      if (distSq <= innerSq) {
+        const z = positions.getZ(i);
+        if (direction * z > direction * coreExtreme) coreExtreme = z;
+        inCore.push(i);
+      }
     }
   }
   if (inCore.length === 0) return;
@@ -200,8 +372,7 @@ function applyLevelOnly(geometry, hitLocal, params, direction) {
   }
 
   positions.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
+  recomputeNormalsInRange(geometry, ixMin, ixMax, iyMin, iyMax);
 }
 
 function applyLevelMode(geometry, hitLocal, params, direction) {
@@ -215,6 +386,12 @@ function applyLevelMode(geometry, hitLocal, params, direction) {
   const signedLevelStep = step * levelSpeed * direction;
   const epsilon = step * 0.5;
 
+  const { ixMin, ixMax, iyMin, iyMax, cols } = brushIndexRange(
+    geometry,
+    hitLocal,
+    size,
+  );
+
   // For lift (+1): want max → seed extreme at -Infinity, prefer larger.
   // For lower (-1): want min → seed extreme at +Infinity, prefer smaller.
   // `direction * z > direction * extreme` works for both cases.
@@ -223,20 +400,23 @@ function applyLevelMode(geometry, hitLocal, params, direction) {
   let coreExtreme = -Infinity * direction;
   let overallExtreme = -Infinity * direction;
 
-  for (let i = 0; i < positions.count; i++) {
-    const dx = positions.getX(i) - hitLocal.x;
-    const dy = positions.getY(i) - hitLocal.y;
-    const distSq = dx * dx + dy * dy;
-    if (distSq >= sizeSq) continue;
+  for (let iy = iyMin; iy <= iyMax; iy++) {
+    for (let ix = ixMin; ix <= ixMax; ix++) {
+      const i = iy * cols + ix;
+      const dx = positions.getX(i) - hitLocal.x;
+      const dy = positions.getY(i) - hitLocal.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= sizeSq) continue;
 
-    const f = falloff(Math.sqrt(distSq), size, hardness);
-    const z = positions.getZ(i);
-    if (direction * z > direction * overallExtreme) overallExtreme = z;
-    inBrush.push({ i, f });
+      const f = falloff(Math.sqrt(distSq), size, hardness);
+      const z = positions.getZ(i);
+      if (direction * z > direction * overallExtreme) overallExtreme = z;
+      inBrush.push({ i, f });
 
-    if (distSq <= innerSq) {
-      if (direction * z > direction * coreExtreme) coreExtreme = z;
-      inCore.push(i);
+      if (distSq <= innerSq) {
+        if (direction * z > direction * coreExtreme) coreExtreme = z;
+        inCore.push(i);
+      }
     }
   }
   if (inBrush.length === 0) return;
@@ -278,6 +458,5 @@ function applyLevelMode(geometry, hitLocal, params, direction) {
   }
 
   positions.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
+  recomputeNormalsInRange(geometry, ixMin, ixMax, iyMin, iyMax);
 }

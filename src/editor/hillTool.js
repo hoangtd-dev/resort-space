@@ -83,6 +83,12 @@ export function createHillTool({
   );
 
   window.addEventListener("pointerup", () => {
+    if (isPainting) {
+      // Bounding sphere only matters for raycaster culling; a single recompute
+      // at stroke end keeps raycasting accurate without paying the cost on
+      // every paint frame.
+      land.geometry.computeBoundingSphere();
+    }
     isPainting = false;
   });
 
