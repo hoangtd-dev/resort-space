@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { applyDefaultTerrain } from "./defaultTerrain";
 
-export const LAND_SIZE = 100;
+export const LAND_SIZE = 400;
 export const LAND_SEGMENTS = 200;
 
 export function createLand() {
@@ -12,7 +12,7 @@ export function createLand() {
     LAND_SEGMENTS,
   );
   const material = new THREE.MeshStandardMaterial({
-    color: 0x4a7040,  // natural muted green — less cartoon, catches directional light well
+    color: 0x4a7040,
     roughness: 0.92,
     metalness: 0.0,
     side: THREE.DoubleSide,
