@@ -4,6 +4,8 @@ import { GRID_CELL_SIZE } from "./snapGrid";
 import { createHillTool, HILL_TOOL_OFF } from "./hillTool";
 import { createHillToolPalette } from "./hillToolPalette";
 import { createPathTool } from "./pathTool";
+import { createSprayPathTool } from "./sprayPathTool";
+import { createConcretePathTool } from "./concretePathTool";
 import { createObjectTool } from "./objectTool";
 import { createPlacementToolPalette } from "./placementToolPalette";
 import { applyDefaultTerrain } from "../scene/land/defaultTerrain";
@@ -49,6 +51,16 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     getSampleHeight,
     getHalfSize: () => land.geometry.parameters.width / 2,
   });
+  const sprayPathTool = createSprayPathTool({
+    scene,
+    land,
+    getSampleHeight,
+    getHalfSize: () => land.geometry.parameters.width / 2,
+  });
+  const concretePathTool = createConcretePathTool({
+    scene,
+    getSampleHeight,
+  });
   const objectTool = createObjectTool({
     scene,
     land,
@@ -60,9 +72,17 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     controls,
     pathState: pathTool.pathState,
     objectState: objectTool.objectState,
+    sprayState: sprayPathTool.sprayState,
+    concreteState: concretePathTool.concreteState,
     placementState,
     onPathTypeChange: () => pathTool.refreshPreviewMaterial(),
     onObjectTypeChange: () => objectTool.refreshFootprint(),
+    onSprayTypeChange: () => {},
+    onConcreteCancel: () => {
+      if (!concretePathTool.isDrafting()) return false;
+      concretePathTool.cancelDraft();
+      return true;
+    },
     onActivate: () => hillTool.setActiveTool(HILL_TOOL_OFF),
   });
 
@@ -114,6 +134,10 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
         deleteAtPointer();
       } else if (placementState.mode === "object") {
         objectTool.placeObject(lastHitWorld.x, lastHitWorld.z);
+      } else if (placementState.mode === "spray") {
+        sprayPathTool.spray(lastHitWorld.x, lastHitWorld.z);
+      } else if (placementState.mode === "concrete") {
+        concretePathTool.addWaypoint(lastHitWorld.x, lastHitWorld.z);
       } else {
         pathTool.setPathAt(lastHitWorld.x, lastHitWorld.z);
       }
@@ -126,6 +150,18 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     pathTool.endStroke();
   });
 
+  window.addEventListener("keydown", (e) => {
+    if (placementState.mode !== "concrete" || !placementState.active) return;
+    if (e.key === "Enter") {
+      if (concretePathTool.commitDraft()) e.preventDefault();
+    } else if (e.key === "Backspace") {
+      if (concretePathTool.isDrafting()) {
+        concretePathTool.undoLastWaypoint();
+        e.preventDefault();
+      }
+    }
+  });
+
   const clock = new THREE.Clock();
 
   // Terrain helpers
@@ -136,12 +172,27 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   function clearAll() {
     pathTool.clearTiles();
+    sprayPathTool.clearAll();
+    concretePathTool.clearAll();
     objectTool.clearObjects();
   }
 
   function deleteAtPointer() {
     if (placementState.mode === "path") {
       pathTool.removePathAt(lastHitWorld.x, lastHitWorld.z);
+      return;
+    }
+    if (placementState.mode === "spray") {
+      sprayPathTool.spray(lastHitWorld.x, lastHitWorld.z, { erase: true });
+      return;
+    }
+    if (placementState.mode === "concrete") {
+      const concreteHits = raycaster.intersectObjects(
+        concretePathTool.committedGroup.children,
+        true,
+      );
+      const hit = concreteHits[0];
+      if (hit) concretePathTool.removeByHitObject(hit.object);
       return;
     }
 
@@ -201,6 +252,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     // Remove only items that now fall outside the new land bounds.
     const half = newSize / 2;
     pathTool.removeTilesOutOfRange(half);
+    sprayPathTool.rebuildForLandResize();
     objectTool.removeObjectsOutOfRange(half);
   }
 
@@ -225,8 +277,11 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
       if (hasHit) lastHitWorld.copy(hits[0].point);
     }
 
+    sprayPathTool.syncOverlayHeights();
     pathTool.updatePreview({ hasHit, lastHitWorld, placementState });
     objectTool.updatePreview({ hasHit, lastHitWorld, placementState });
+    sprayPathTool.updateCursor({ hasHit, lastHitWorld, placementState });
+    concretePathTool.updateGhost({ hasHit, lastHitWorld, placementState });
     hillTool.update(dt, { hasHit, lastHitWorld });
 
     if (
@@ -241,6 +296,18 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
       } else {
         pathTool.setPathAt(lastHitWorld.x, lastHitWorld.z);
       }
+    }
+
+    if (
+      isPointerDown &&
+      hasHit &&
+      placementState.active &&
+      placementState.mode === "spray" &&
+      !hillTool.isActive()
+    ) {
+      sprayPathTool.spray(lastHitWorld.x, lastHitWorld.z, {
+        erase: placementState.action === "delete",
+      });
     }
   }
 

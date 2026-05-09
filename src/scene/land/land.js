@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { applyDefaultTerrain } from "./defaultTerrain";
+import { getToonGradient } from "../../utils/toonGradient";
 
 export const LAND_SIZE = 100;
 export const LAND_SEGMENTS = 200;
@@ -11,8 +12,9 @@ export function createLand() {
     LAND_SEGMENTS,
     LAND_SEGMENTS,
   );
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x5cb85c,
+  const material = new THREE.MeshToonMaterial({
+    color: 0x7fc26b,
+    gradientMap: getToonGradient(),
     side: THREE.DoubleSide,
   });
   const land = new THREE.Mesh(geometry, material);
