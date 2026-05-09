@@ -8,12 +8,13 @@ import { createSprayPathTool } from "./sprayPathTool";
 import { createConcretePathTool } from "./concretePathTool";
 import { createObjectTool } from "./objectTool";
 import { createPlacementToolPalette } from "./placementToolPalette";
-import { applyDefaultTerrain } from "../scene/land/defaultTerrain";
+import { applyBeachfrontTerrain } from "../scene/beachfront/beachfront";
 import { DEFAULT_PATHS, DEFAULT_OBJECTS } from "../scene/land/defaultLayout";
 
 export function createTerrainEditor({ scene, camera, controls, renderer }) {
-  const land = scene.getObjectByName("land");
-  if (!land) throw new Error("terrainEditor: scene has no object named 'land'");
+  const land = scene.getObjectByName("beachfront");
+  if (!land)
+    throw new Error("terrainEditor: scene has no object named 'beachfront'");
 
   // Shared mutable sampler — recreated on resize
   let sampleHeight = makeHeightSampler(land);
@@ -49,13 +50,21 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     scene,
     occupiedCells,
     getSampleHeight,
-    getHalfSize: () => land.geometry.parameters.width / 2,
+    getHalfSize: () =>
+      Math.min(
+        land.geometry.parameters.width,
+        land.geometry.parameters.height,
+      ) / 2,
   });
   const sprayPathTool = createSprayPathTool({
     scene,
     land,
     getSampleHeight,
-    getHalfSize: () => land.geometry.parameters.width / 2,
+    getHalfSize: () =>
+      Math.min(
+        land.geometry.parameters.width,
+        land.geometry.parameters.height,
+      ) / 2,
   });
   const concretePathTool = createConcretePathTool({
     scene,
@@ -166,7 +175,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   // Terrain helpers
   function resetTerrain() {
-    applyDefaultTerrain(land);
+    applyBeachfrontTerrain(land);
     pathTool.clearTiles();
   }
 
@@ -325,10 +334,15 @@ function makeHeightSampler(land) {
   const cols = widthSegments + 1;
   const halfW = width / 2;
   const halfH = height / 2;
+  const offsetX = land.position.x;
+  const offsetY = land.position.y;
+  const offsetZ = land.position.z;
 
   return function sample(worldX, worldZ) {
-    const ixF = (worldX + halfW) / cw;
-    const iyF = (halfH + worldZ) / ch;
+    const lx = worldX - offsetX;
+    const lz = worldZ - offsetZ;
+    const ixF = (lx + halfW) / cw;
+    const iyF = (halfH + lz) / ch;
     if (ixF < 0 || ixF >= widthSegments) return 0;
     if (iyF < 0 || iyF >= heightSegments) return 0;
     const ix = Math.floor(ixF);
@@ -339,6 +353,8 @@ function makeHeightSampler(land) {
     const z10 = positions.getZ(iy * cols + ix + 1);
     const z01 = positions.getZ((iy + 1) * cols + ix);
     const z11 = positions.getZ((iy + 1) * cols + ix + 1);
-    return (z00 * (1 - u) + z10 * u) * (1 - v) + (z01 * (1 - u) + z11 * u) * v;
+    const localZ =
+      (z00 * (1 - u) + z10 * u) * (1 - v) + (z01 * (1 - u) + z11 * u) * v;
+    return localZ + offsetY;
   };
 }

@@ -47,7 +47,6 @@ export function createBeachfront() {
     const lx = pos.getX(i);
     const ly = pos.getY(i);
 
-    // After rotation.x = -π/2, local +y maps to world -z (inland).
     const t = (ly + BEACHFRONT_DEPTH / 2) / BEACHFRONT_DEPTH;
 
     pos.setZ(i, computeHeight(t, lx, ly));
@@ -61,6 +60,7 @@ export function createBeachfront() {
   pos.needsUpdate = true;
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
+  geo.computeBoundingSphere();
 
   const mat = new THREE.MeshLambertMaterial({
     vertexColors: true,
@@ -76,6 +76,21 @@ export function createBeachfront() {
   mesh.receiveShadow = true;
   mesh.castShadow = true;
   return mesh;
+}
+
+// Reset every vertex to the procedural beachfront preset.
+// Used by the terrain editor's "reset" action.
+export function applyBeachfrontTerrain(mesh) {
+  const pos = mesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const lx = pos.getX(i);
+    const ly = pos.getY(i);
+    const t = (ly + BEACHFRONT_DEPTH / 2) / BEACHFRONT_DEPTH;
+    pos.setZ(i, computeHeight(t, lx, ly));
+  }
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  mesh.geometry.computeBoundingSphere();
 }
 
 // Advance shader time uniform — call from animate loop.

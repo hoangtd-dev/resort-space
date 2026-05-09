@@ -150,6 +150,7 @@ export function applyCircleBrushLiftSmooth(geometry, hitLocal, params) {
 
   positions.needsUpdate = true;
   geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
 }
 
 // Phase-1-only variant of level-mode. Off-extreme core verts catch up toward
@@ -200,6 +201,7 @@ function applyLevelOnly(geometry, hitLocal, params, direction) {
 
   positions.needsUpdate = true;
   geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
 }
 
 function applyLevelMode(geometry, hitLocal, params, direction) {
@@ -277,4 +279,5 @@ function applyLevelMode(geometry, hitLocal, params, direction) {
 
   positions.needsUpdate = true;
   geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
 }
