@@ -7,8 +7,12 @@ import { createGrid } from "./grid/grid";
 
 export function createScene() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
-  scene.fog = new THREE.FogExp2(0x87ceeb, 0.003);
+
+
+  scene.background = new THREE.Color(0x9bbcd4);
+
+  //  distant terrain fades naturally
+  scene.fog = new THREE.FogExp2(0xb0c8d8, 0.005);
 
   scene.add(createOcean());
   scene.add(createLand());

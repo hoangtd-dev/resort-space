@@ -264,7 +264,7 @@ body {
 .bottom-left-stack {
   position: fixed;
   left: 16px;
-  bottom: 16px;
+  bottom: 24px;
   display: flex;
   flex-direction: row;
   gap: 14px;
