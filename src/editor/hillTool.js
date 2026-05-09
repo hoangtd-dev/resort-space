@@ -1,118 +1,83 @@
 import * as THREE from "three";
-import GUI from "lil-gui";
 import {
-  applyCircleBrush,
-  applyCircleBrushLevelLift,
   applyCircleBrushLevelOnly,
   applyCircleBrushLiftSmooth,
 } from "./brush";
 
-const ALGO_NAIVE = "naive";
-const ALGO_LEVEL_LIFT = "levelLift";
-const ALGO_LIFT_SMOOTH = "liftSmooth";
+export const HILL_TOOL_OFF = "off";
+export const HILL_TOOL_HILL_UP = "hillUp";
+export const HILL_TOOL_HILL_DOWN = "hillDown";
+export const HILL_TOOL_LEVEL_UP = "levelUp";
+export const HILL_TOOL_LEVEL_DOWN = "levelDown";
 
-const TOOL_OFF = "off";
-const TOOL_HILL = "hill";
-
-const ACTION_MAKE = "make";
-const ACTION_LEVEL = "level";
-
-const COLOR_MAKE_OUTER = 0xffff00;
-const COLOR_MAKE_INNER = 0xff8800;
-const COLOR_LEVEL_OUTER = 0x66ff66;
-const COLOR_LEVEL_INNER = 0x009933;
-
+const RING_COLOR_OUTER = 0x66ff99;
+const RING_COLOR_INNER = 0x009933;
 const RING_SEGMENTS = 96;
 const SURFACE_OFFSET = 0.05;
 
 export function createHillTool({
   scene,
   land,
-  camera,
   controls,
   renderer,
   getSampleHeight,
-  onReset,
+  onActivate,
 }) {
   const canvas = renderer.domElement;
 
   const state = {
-    tool: TOOL_OFF,
-    hillAction: ACTION_MAKE,
-    makeAlgo: ALGO_LIFT_SMOOTH,
+    activeTool: HILL_TOOL_OFF,
     size: 8,
     hardness: 0.3,
     strength: 4,
-    levelSpeed: 3,
     smoothness: 5,
   };
 
-  let isShiftDown = false;
   let isPainting = false;
+  let onActiveToolChange = null;
 
-  // Brush indicator
   const indicator = createDonutIndicator(RING_SEGMENTS);
   indicator.visible = false;
   scene.add(indicator);
   const outerRing = indicator.children[0];
   const innerRing = indicator.children[1];
 
-  // lil-gui panel
-  const gui = new GUI({ title: "Terrain — off" });
+  // Default LEFT binding for restoration on disarm.
+  const defaultLeftButton = controls.mouseButtons.LEFT ?? THREE.MOUSE.PAN;
 
-  gui.add({ toggle: () => toggleTool(TOOL_HILL) }, "toggle").name("Hill");
+  function setActiveTool(t) {
+    const prev = state.activeTool;
+    const next = prev === t ? HILL_TOOL_OFF : t;
+    if (next === prev) return;
+    state.activeTool = next;
 
-  const hillFolder = gui.addFolder("Hill action");
-  hillFolder
-    .add(state, "hillAction", { "Make Hill": ACTION_MAKE, Level: ACTION_LEVEL })
-    .name("Action")
-    .onChange(refreshIndicatorColor);
-  hillFolder
-    .add(state, "makeAlgo", {
-      "Naive (just lift)": ALGO_NAIVE,
-      "Level → Lift": ALGO_LEVEL_LIFT,
-      "Lift + Smooth": ALGO_LIFT_SMOOTH,
-    })
-    .name("Make algorithm");
-  hillFolder.add(state, "smoothness", 0, 20, 0.5).name("smoothness");
+    // Notify exclusivity hook (other tools deactivate) BEFORE we set our
+    // controls.LEFT so their cleanup doesn't override us.
+    if (prev === HILL_TOOL_OFF && next !== HILL_TOOL_OFF && onActivate) {
+      onActivate();
+    }
 
-  gui.add(state, "size", 1, 30, 0.5);
-  gui.add(state, "hardness", 0, 1, 0.05);
-  gui.add({ reset: () => onReset() }, "reset").name("Reset Terrain");
-
-  // Internal helpers
-  function toggleTool(t) {
-    state.tool = state.tool === t ? TOOL_OFF : t;
-    gui.title(
-      `Terrain — ${state.tool}${state.tool === TOOL_OFF ? "" : " (hold Shift to paint)"}`,
-    );
-    if (state.tool === TOOL_OFF) {
+    if (next === HILL_TOOL_OFF) {
       indicator.visible = false;
-      controls.enabled = true;
-      isShiftDown = false;
       isPainting = false;
+      controls.mouseButtons.LEFT = defaultLeftButton;
     } else {
-      refreshIndicatorColor();
+      controls.mouseButtons.LEFT = null;
     }
+    if (onActiveToolChange) onActiveToolChange();
   }
 
-  function refreshIndicatorColor() {
-    if (state.tool === TOOL_HILL && state.hillAction === ACTION_LEVEL) {
-      outerRing.material.color.setHex(COLOR_LEVEL_OUTER);
-      innerRing.material.color.setHex(COLOR_LEVEL_INNER);
-    } else {
-      outerRing.material.color.setHex(COLOR_MAKE_OUTER);
-      innerRing.material.color.setHex(COLOR_MAKE_INNER);
-    }
+  function setOnActiveToolChange(cb) {
+    onActiveToolChange = cb;
   }
 
-  // Input
   canvas.addEventListener(
     "pointerdown",
     (e) => {
-      if (e.button !== 0 || state.tool === TOOL_OFF || !isShiftDown) return;
+      if (e.button !== 0 || state.activeTool === HILL_TOOL_OFF) return;
       isPainting = true;
       e.preventDefault();
+      e.stopPropagation();
     },
     { capture: true },
   );
@@ -122,23 +87,13 @@ export function createHillTool({
   });
 
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Shift" && state.tool !== TOOL_OFF) {
-      isShiftDown = true;
-      controls.enabled = false;
+    if (e.key === "Escape" && state.activeTool !== HILL_TOOL_OFF) {
+      setActiveTool(HILL_TOOL_OFF);
     }
   });
 
-  window.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") {
-      isShiftDown = false;
-      isPainting = false;
-      controls.enabled = true;
-    }
-  });
-
-  // Per-frame update
   function update(dt, { hasHit, lastHitWorld }) {
-    if (state.tool === TOOL_OFF) {
+    if (state.activeTool === HILL_TOOL_OFF) {
       indicator.visible = false;
       return;
     }
@@ -164,43 +119,47 @@ export function createHillTool({
       sampleHeight,
     );
 
-    if (isPainting && isShiftDown) {
-      const hitLocal = land.worldToLocal(lastHitWorld.clone());
-      const params = {
-        size: state.size,
-        hardness: state.hardness,
-        strength: state.strength,
-        levelSpeed: state.levelSpeed,
-        smoothness: state.smoothness,
-        direction: 1,
-        dt,
-      };
-      if (state.hillAction === ACTION_LEVEL) {
-        applyCircleBrushLevelOnly(land.geometry, hitLocal, params);
-      } else if (state.makeAlgo === ALGO_LEVEL_LIFT) {
-        applyCircleBrushLevelLift(land.geometry, hitLocal, params);
-      } else if (state.makeAlgo === ALGO_LIFT_SMOOTH) {
-        applyCircleBrushLiftSmooth(land.geometry, hitLocal, params);
-      } else {
-        applyCircleBrush(land.geometry, hitLocal, params);
-      }
+    if (!isPainting) return;
+
+    const hitLocal = land.worldToLocal(lastHitWorld.clone());
+    const direction =
+      state.activeTool === HILL_TOOL_HILL_DOWN ||
+      state.activeTool === HILL_TOOL_LEVEL_DOWN
+        ? -1
+        : 1;
+    const params = {
+      size: state.size,
+      hardness: state.hardness,
+      strength: state.strength,
+      smoothness: state.smoothness,
+      direction,
+      dt,
+    };
+
+    if (
+      state.activeTool === HILL_TOOL_HILL_UP ||
+      state.activeTool === HILL_TOOL_HILL_DOWN
+    ) {
+      applyCircleBrushLiftSmooth(land.geometry, hitLocal, params);
+    } else {
+      applyCircleBrushLevelOnly(land.geometry, hitLocal, params);
     }
   }
 
   return {
-    isActive: () => state.tool !== TOOL_OFF,
-    isShiftHeld: () => isShiftDown,
+    state,
+    setActiveTool,
+    setOnActiveToolChange,
+    isActive: () => state.activeTool !== HILL_TOOL_OFF,
     update,
   };
 }
 
-// Private helpers
-
 function createDonutIndicator(segments) {
   const group = new THREE.Group();
   group.name = "brushIndicator";
-  group.add(makeRingLine(COLOR_MAKE_OUTER, segments));
-  group.add(makeRingLine(COLOR_MAKE_INNER, segments));
+  group.add(makeRingLine(RING_COLOR_OUTER, segments));
+  group.add(makeRingLine(RING_COLOR_INNER, segments));
   return group;
 }
 

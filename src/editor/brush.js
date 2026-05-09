@@ -92,10 +92,10 @@ export function applyCircleBrushLevelLower(geometry, hitLocal, params) {
 //
 // Tunable via params.smoothness (default 5 = strong smoothing per second).
 export function applyCircleBrushLiftSmooth(geometry, hitLocal, params) {
-  const { size, hardness, strength, dt, smoothness = 5 } = params;
+  const { size, hardness, strength, dt, smoothness = 5, direction = 1 } = params;
   const positions = geometry.attributes.position;
   const sizeSq = size * size;
-  const step = strength * dt;
+  const step = direction * strength * dt;
   const smoothStep = Math.min(smoothness * dt, 1);
 
   const { widthSegments, heightSegments } = geometry.parameters;
@@ -160,7 +160,8 @@ export function applyCircleBrushLiftSmooth(geometry, hitLocal, params) {
 // `direction = +1`: extreme = max (level low spots up to local max).
 // `direction = -1`: extreme = min (level high spots down to local min).
 export function applyCircleBrushLevelOnly(geometry, hitLocal, params) {
-  applyLevelOnly(geometry, hitLocal, params, 1);
+  const direction = params.direction === -1 ? -1 : 1;
+  applyLevelOnly(geometry, hitLocal, params, direction);
 }
 
 function applyLevelOnly(geometry, hitLocal, params, direction) {
