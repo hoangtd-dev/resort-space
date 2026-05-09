@@ -7,9 +7,10 @@ export function applyDefaultTerrain(land) {
 
   for (let iy = 0; iy < rows; iy++) {
     for (let ix = 0; ix < cols; ix++) {
+      const i = iy * cols + ix;
       const wx = (ix / widthSegments - 0.5) * width;
       const wz = (iy / heightSegments - 0.5) * height;
-      pos.setZ(iy * cols + ix, computeHeight(wx, wz));
+      pos.setZ(i, computeHeight(wx, wz));
     }
   }
 
@@ -17,17 +18,12 @@ export function applyDefaultTerrain(land) {
   geo.computeVertexNormals();
 }
 
-// Returns the terrain height at world position (wx, wz).
-// Built from stacked Gaussian "bell" bumps — easy to add, move, or resize.
 function computeHeight(wx, wz) {
   let h = 0;
 
-  // Gentle base slope — back of the map is slightly higher than the front.
-  h += 3 * ((wz + 50) / 100);
+  // Gentle slope scaled to the 400-unit land extent.
+  h += 3 * ((wz + 200) / 400);
 
-  // Each hill() call adds one smooth bump.
-  // Arguments: hill(centerX, centerZ, radiusX, radiusZ)
-  // Multiply by a number to control its peak height.
   h += 13 * hill(wx, wz,   5,  10, 22, 17); // main central plateau
   h +=  7 * hill(wx, wz, -14,   6, 16, 14); // left wing
   h +=  6 * hill(wx, wz,  26,   2, 13, 20); // right ridge
@@ -36,21 +32,35 @@ function computeHeight(wx, wz) {
   h +=  3 * hill(wx, wz,  36,  17, 10, 12); // right-back bump
   h -=  2 * hill(wx, wz, -10, -25, 14, 10); // front-left dip
 
-  // Add slight surface roughness so the ground isn't perfectly smooth.
   h += roughness(wx, wz);
 
-  return Math.max(0, h); // never go below ground level
+  const mask = islandMask(wx, wz);
+  // Sink = 0.7: outer edge lands at y = -0.7 (hidden under ocean at y = -0.5),
+  // while the transition zone stays above ocean for mask > 0.29, preventing
+  // any visible blue patches inside the land.
+  return (Math.max(0, h) + 0.7) * mask - 0.7;
 }
 
-// Smooth bell-shaped bump centred at (cx, cz) with radii (rx, rz).
-// Returns 1 at the centre and fades to 0 at the edges.
+function islandMask(wx, wz) {
+  const dist = Math.sqrt(wx * wx + wz * wz);
+  // Rounded natural coastline for most of the island.
+  const ovalMask = 1.0 - smoothstep(130, 175, dist);
+  // Right edge: straight vertical border — no curve, no hills.
+  const rightMask = 1.0 - smoothstep(140, 165, wx);
+  return Math.min(ovalMask, rightMask);
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
 function hill(wx, wz, cx, cz, rx, rz) {
   const dx = (wx - cx) / rx;
   const dz = (wz - cz) / rz;
   return Math.exp(-(dx * dx + dz * dz) / 2);
 }
 
-// Layered sine waves that add subtle, organic surface variation.
 function roughness(wx, wz) {
   const k = 0.075;
   return (
