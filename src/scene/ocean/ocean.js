@@ -4,17 +4,17 @@ import * as THREE from "three";
 const SHORE_Z = 140.0;
 
 export function createOcean() {
-  const geo = new THREE.PlaneGeometry(1200, 1200);
+  const geo = new THREE.PlaneGeometry(1100, 600);
 
   const mat = new THREE.ShaderMaterial({
     fog: true,
     uniforms: {
       ...THREE.UniformsLib.fog,
-      time:         { value: 0 },
+      time: { value: 0 },
       colorShallow: { value: new THREE.Color(0x72e8d5) },
-      colorMid:     { value: new THREE.Color(0x38c8d8) },
-      colorDeep:    { value: new THREE.Color(0x28afc5) },
-      shoreZ:       { value: SHORE_Z },
+      colorMid: { value: new THREE.Color(0x38c8d8) },
+      colorDeep: { value: new THREE.Color(0x28afc5) },
+      shoreZ: { value: SHORE_Z },
     },
     vertexShader: /* glsl */`
       #include <fog_pars_vertex>
@@ -55,7 +55,7 @@ export function createOcean() {
         float oShore = organicShoreZ(vWorldPos.x);
 
         // depth: 0 = near organic shore, 1 = deep ocean
-        float depth = clamp((oShore - vWorldPos.z) / 280.0, 0.0, 1.0);
+        float depth = clamp((vWorldPos.z - oShore) / 280.0, 0.0, 1.0);
 
         // --- base water color ---
         float n1 = waveNoise(vWorldPos.xz,              0.35, 0.045) * 0.5 + 0.5;
@@ -84,6 +84,6 @@ export function createOcean() {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = "ocean";
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = 0;
+  mesh.position.set(0, 0.5, 440);
   return mesh;
 }

@@ -1,7 +1,7 @@
 // Hard limits on terrain height. Prevents bottomless craters / sky-piercing
 // spikes. Tune as needed for the resort scale (units = world meters).
 export const MIN_HEIGHT = -8;
-export const MAX_HEIGHT = 30;
+export const MAX_HEIGHT = 60;
 
 function clampHeight(z) {
   if (z < MIN_HEIGHT) return MIN_HEIGHT;

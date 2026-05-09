@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { MapControls } from "three/addons/controls/MapControls.js";
 
-export const PAN_MIN = new THREE.Vector3(-120, 0, -100);
-export const PAN_MAX = new THREE.Vector3(120, 0, 60);
+// Resort area — camera is clamped here. Resize to taste.
+export const PAN_MIN = new THREE.Vector3(-180, 0, -270);
+export const PAN_MAX = new THREE.Vector3( 180, 0,   50);
 const KEY_SPEED = 2;
 const UP = new THREE.Vector3(0, 1, 0);
 

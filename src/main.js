@@ -6,7 +6,7 @@ import { createCamera } from "./camera/camera";
 import { createRenderer } from "./renderer/renderer";
 import { createControls } from "./controls/controls";
 import { createTerrainEditor } from "./editor/terrainEditor";
-import { updateBeachfront } from "./scene/beachfront/beachfront";
+import { updateLand } from "./scene/land/land";
 
 const scene = createScene();
 const camera = createCamera();
@@ -41,8 +41,8 @@ function animate() {
   const ocean = scene.getObjectByName("ocean");
   if (ocean) ocean.material.uniforms.time.value += dt;
 
-  const beachfront = scene.getObjectByName("beachfront");
-  if (beachfront) updateBeachfront(beachfront, dt);
+  const land = scene.getObjectByName("land");
+  if (land) updateLand(land, dt);
 
   renderer.render(scene, camera);
 }
