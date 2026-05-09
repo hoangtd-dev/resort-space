@@ -1,9 +1,23 @@
 import * as THREE from "three";
 
 export const LAND_WIDTH = 900;
-export const LAND_DEPTH = 600;
+const SHORE_Z = 140; // must match ocean.js SHORE_Z
 const WIDTH_SEGMENTS = 300;
-const DEPTH_SEGMENTS = 500;
+
+// Mutable config — edit via Terrain Tuner UI.
+// 3-level slope: beach ramp → level 1 → level 2 → level 3 (peak) → plateau → forest
+export const LAND_CONFIG = {
+  depth:        550,  // physical terrain depth (world units)
+  beachRampEndT: 0.14, // t where beach ramp ends / first slope starts
+  l1EndT:       0.27, // t where level-1 slope ends
+  l1Height:     24,   // height at top of level-1
+  l2EndT:       0.40, // t where level-2 slope ends
+  l2Height:     49,   // height at top of level-2
+  l3EndT:       0.53, // t where level-3 slope ends (cliff peak)
+  l3Height:     73,   // peak height
+};
+
+export function getLandDepth() { return LAND_CONFIG.depth; }
 
 const C_DRY_SAND = new THREE.Color(0xf5dfa0);
 const C_LAWN = new THREE.Color(0x78c850);
@@ -32,60 +46,64 @@ const FOAM_DEFAULTS = {
 const WET_TINT = new THREE.Color(0x110a02);
 
 export function createLand() {
-  const geo = new THREE.PlaneGeometry(
-    LAND_WIDTH,
-    LAND_DEPTH,
-    WIDTH_SEGMENTS,
-    DEPTH_SEGMENTS,
-  );
+  const depth = LAND_CONFIG.depth;
+  const depthSegs = Math.round(WIDTH_SEGMENTS * depth / LAND_WIDTH);
+  const geo = new THREE.PlaneGeometry(LAND_WIDTH, depth, WIDTH_SEGMENTS, depthSegs);
+  _fillGeometry(geo);
 
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const tmp = new THREE.Color();
-
-  for (let i = 0; i < pos.count; i++) {
-    const lx = pos.getX(i);
-    const ly = pos.getY(i);
-
-    const t = (ly + LAND_DEPTH / 2) / LAND_DEPTH;
-
-    pos.setZ(i, computeHeight(t, lx, ly));
-
-    pickColor(t, tmp);
-    colors[i * 3 + 0] = tmp.r;
-    colors[i * 3 + 1] = tmp.g;
-    colors[i * 3 + 2] = tmp.b;
-  }
-
-  pos.needsUpdate = true;
-  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geo.computeVertexNormals();
-  geo.computeBoundingSphere();
-
-  const mat = new THREE.MeshLambertMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-  });
-
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   patchFoamShader(mat);
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = "land";
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(0, 0, -160);
+  mesh.position.set(0, 0, SHORE_Z - depth / 2);
   mesh.receiveShadow = true;
   mesh.castShadow = true;
   return mesh;
 }
 
+// Rebuild geometry for a new LAND_CONFIG.depth, preserving material.
+// Call after mutating LAND_CONFIG.depth.
+export function rebuildLandGeometry(mesh) {
+  mesh.geometry.dispose();
+  const depth = LAND_CONFIG.depth;
+  const depthSegs = Math.round(WIDTH_SEGMENTS * depth / LAND_WIDTH);
+  mesh.geometry = new THREE.PlaneGeometry(LAND_WIDTH, depth, WIDTH_SEGMENTS, depthSegs);
+  mesh.position.set(0, 0, SHORE_Z - depth / 2);
+  _fillGeometry(mesh.geometry);
+  mesh.geometry.computeBoundingSphere();
+}
+
+function _fillGeometry(geo) {
+  const depth = LAND_CONFIG.depth;
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const lx = pos.getX(i);
+    const ly = pos.getY(i);
+    const t = (ly + depth / 2) / depth;
+    pos.setZ(i, computeHeight(t, lx, ly));
+    pickColor(t, tmp);
+    colors[i * 3]     = tmp.r;
+    colors[i * 3 + 1] = tmp.g;
+    colors[i * 3 + 2] = tmp.b;
+  }
+  pos.needsUpdate = true;
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+}
+
 // Reset every vertex to the procedural land preset.
 // Used by the terrain editor's "reset" action.
 export function applyLandTerrain(mesh) {
+  const depth = LAND_CONFIG.depth;
   const pos = mesh.geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const lx = pos.getX(i);
     const ly = pos.getY(i);
-    const t = (ly + LAND_DEPTH / 2) / LAND_DEPTH;
+    const t = (ly + depth / 2) / depth;
     pos.setZ(i, computeHeight(t, lx, ly));
   }
   pos.needsUpdate = true;
@@ -214,13 +232,13 @@ function patchFoamShader(mat) {
 // Flat-zone baseline must sit above ocean (y=0) so roughness noise doesn't punch through.
 const FLAT_LIFT = 0.6;
 
-// Mesh is at position (0, 0, -160), rotated -PI/2 on X.
-// worldZ = -ly - 160  →  ly = -worldZ - 160
-// t      = (140 - worldZ) / 600
+// worldZ = -ly + meshPosZ  →  ly = meshPosZ - worldZ,  t = (SHORE_Z - worldZ) / depth
 export function getTerrainHeight(worldX, worldZ) {
-  const t  = Math.max(0, Math.min(1, (140 - worldZ) / 600));
+  const depth   = LAND_CONFIG.depth;
+  const meshPosZ = SHORE_Z - depth / 2;
+  const t  = Math.max(0, Math.min(1, (SHORE_Z - worldZ) / depth));
   const lx = worldX;
-  const ly = -worldZ - 160;
+  const ly = meshPosZ - worldZ;
   return computeHeight(t, lx, ly);
 }
 
@@ -230,26 +248,28 @@ function computeHeight(t, lx, ly) {
   if (t < 0.05) {
     // Beach flat — sea-level sand
     h = FLAT_LIFT;
-  } else if (t < 0.15) {
-    // Beach rise: 0.6 → 3
-    h = FLAT_LIFT + (3 - FLAT_LIFT) * smoothstep(0.05, 0.15, t);
-  } else if (t < 0.68) {
-    // Steep hillside S-curve: 3 → 30
-    h = 3 + 27 * smoothstep(0.15, 0.68, t);
-  } else if (t < 0.80) {
-    // Back ridge plateau: 28 → 32
-    h = 28 + 4 * smoothstep(0.68, 0.80, t);
+  } else if (t < LAND_CONFIG.beachRampEndT) {
+    h = FLAT_LIFT + (4 - FLAT_LIFT) * smoothstep(0.05, LAND_CONFIG.beachRampEndT, t);
+  } else if (t < LAND_CONFIG.l1EndT) {
+    h = 4 + (LAND_CONFIG.l1Height - 4) * smoothstep(LAND_CONFIG.beachRampEndT, LAND_CONFIG.l1EndT, t);
+  } else if (t < LAND_CONFIG.l2EndT) {
+    h = LAND_CONFIG.l1Height + (LAND_CONFIG.l2Height - LAND_CONFIG.l1Height) * smoothstep(LAND_CONFIG.l1EndT, LAND_CONFIG.l2EndT, t);
+  } else if (t < LAND_CONFIG.l3EndT) {
+    h = LAND_CONFIG.l2Height + (LAND_CONFIG.l3Height - LAND_CONFIG.l2Height) * smoothstep(LAND_CONFIG.l2EndT, LAND_CONFIG.l3EndT, t);
+  } else if (t < 0.85) {
+    h = LAND_CONFIG.l3Height;
   } else {
-    // Far forest: stays at ridge height
-    h = 32;
+    h = LAND_CONFIG.l3Height + 5;
   }
 
-  // Lateral undulation — drainage gullies and ridges on the hillside
-  const undulationBlend = smoothstep(0.12, 0.25, t) * (1 - smoothstep(0.65, 0.80, t));
-  h += (Math.sin(lx * 0.034 + 0.5) * 3.5 + Math.sin(lx * 0.019 - 0.9) * 2.0) * undulationBlend;
+  // Undulation on plateau only
+  const plateauStart = LAND_CONFIG.l3EndT;
+  const undulationBlend = smoothstep(plateauStart, plateauStart + 0.10, t) * (1 - smoothstep(0.78, 0.88, t));
+  h += (Math.sin(lx * 0.034 + 0.5) * 2.5 + Math.sin(lx * 0.019 - 0.9) * 1.5) * undulationBlend;
 
-  // Roughness — slightly stronger on slope
-  const roughScale = 0.3 + 0.4 * smoothstep(0.15, 0.68, t);
+  // Roughness — peaks on the slope face
+  const cliffBlend = smoothstep(LAND_CONFIG.beachRampEndT, LAND_CONFIG.l3EndT, t) * (1 - smoothstep(LAND_CONFIG.l3EndT, LAND_CONFIG.l3EndT + 0.10, t));
+  const roughScale = 0.25 + 1.2 * cliffBlend;
   h += roughness(lx, ly) * roughScale;
 
   // Front edge dips below ocean so the water plane covers it.

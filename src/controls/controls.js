@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { MapControls } from "three/addons/controls/MapControls.js";
 
 // Resort area — camera is clamped here. Resize to taste.
-export const PAN_MIN = new THREE.Vector3(-180, 0, -270);
-export const PAN_MAX = new THREE.Vector3( 180, 0,   50);
+export const PAN_MIN = new THREE.Vector3(-180, 0, -120);
+export const PAN_MAX = new THREE.Vector3(180, 0, 50);
 const KEY_SPEED = 2;
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -14,9 +14,9 @@ export function createControls(camera, domElement) {
   controls.dampingFactor = 0.08;
 
   controls.minDistance = 5;
-  controls.maxDistance = 200;
+  controls.maxDistance = 600;
 
-  controls.maxPolarAngle = Math.PI / 2 - 0.25;
+  controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
   controls.screenSpacePanning = false;
 

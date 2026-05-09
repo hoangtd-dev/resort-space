@@ -65,12 +65,18 @@ All changes are in `computeHeight(t, lx, ly)` inside `src/scene/land/land.js`:
 
 ---
 
-## Key Numbers (adjust to taste)
+## Key Numbers (tuned via Terrain Tuner UI)
 
-| Parameter | Value | File |
+| Parameter | Value | Field in `LAND_CONFIG` |
 |---|---|---|
-| Beach flat height | 0.6 (`FLAT_LIFT`) | `land.js` |
-| Hillside peak height | ~17 | `land.js` `computeHeight` |
-| Resort rear Z (road level) | −270 | `controls.js` `PAN_MIN.z` |
+| Inland depth | 550 | `depth` |
+| Beach ramp end t | 0.14 | `beachRampEndT` |
+| Level 1 end t | 0.27 | `l1EndT` |
+| Level 1 height | 24 | `l1Height` |
+| Level 2 end t | 0.40 | `l2EndT` |
+| Level 2 height | 49 | `l2Height` |
+| Level 3 end t | 0.53 | `l3EndT` |
+| Level 3 height (peak) | 73 | `l3Height` |
+| Resort rear Z | −120 | `controls.js` `PAN_MIN.z` |
 | Resort X width | ±180 | `controls.js` `PAN_MIN/MAX.x` |
 | Shore Z | +140 | `ocean.js` `SHORE_Z` |

@@ -5,13 +5,13 @@ import { getTerrainHeight } from "../land/land";
 // These must stay in sync with PAN_MIN / PAN_MAX in controls.js.
 export const RESORT_X_MIN = -180;
 export const RESORT_X_MAX =  180;
-export const RESORT_Z_MIN = -270;
+export const RESORT_Z_MIN =  -80;
 export const RESORT_Z_MAX =   50;
 
 // ── Land bounds (world-space) ─────────────────────────────────────────────────
 const LAND_X_HALF  = 450;   // ±450 in X
 const LAND_Z_SHORE = 130;   // just inside the waterline
-const LAND_Z_BACK  = -450;  // just inside the far inland edge
+const LAND_Z_BACK  = -150;  // just inside the far inland edge (terrain depth halved)
 // Side-edge drop zone: terrain plunges below water beyond 75% of half-width.
 const EDGE_DROP_X  = LAND_X_HALF * 0.72; // leave a small extra buffer
 
@@ -47,8 +47,8 @@ export function createTrees() {
     // Skip side-edge drop zones (terrain plunges there)
     if (Math.abs(x) > EDGE_DROP_X) continue;
 
-    // Skip sand / beach zone (t < 0.32 → worldZ > -52)
-    if (z > -60) continue;
+    // Skip beach and cliff face — trees start on the plateau (worldZ < 15)
+    if (z > 15) continue;
 
     // Skip inside resort area + buffer
     if (
