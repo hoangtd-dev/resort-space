@@ -7,7 +7,6 @@ import { createRenderer } from "./renderer/renderer";
 import { createControls } from "./controls/controls";
 import { createTerrainEditor } from "./editor/terrainEditor";
 import { updateLand } from "./scene/land/land";
-import { createTerrainTuner } from "./scene/land/terrainTuner";
 
 const scene = createScene();
 const camera = createCamera();
@@ -26,7 +25,6 @@ const terrainEditor = createTerrainEditor({
 });
 
 const land = scene.getObjectByName("land");
-createTerrainTuner(land);
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
