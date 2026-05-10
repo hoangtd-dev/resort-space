@@ -14,8 +14,7 @@ import { DEFAULT_PATHS, DEFAULT_OBJECTS } from "../scene/land/defaultLayout";
 
 export function createTerrainEditor({ scene, camera, controls, renderer }) {
   const land = scene.getObjectByName("land");
-  if (!land)
-    throw new Error("terrainEditor: scene has no object named 'land'");
+  if (!land) throw new Error("terrainEditor: scene has no object named 'land'");
   const trees = scene.getObjectByName("trees");
 
   // Shared mutable sampler — recreated on resize
