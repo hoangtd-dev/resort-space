@@ -6,7 +6,8 @@ import { createCamera } from "./camera/camera";
 import { createRenderer } from "./renderer/renderer";
 import { createControls } from "./controls/controls";
 import { createTerrainEditor } from "./editor/terrainEditor";
-import { updateBeachfront } from "./scene/beachfront/beachfront";
+import { updateLand } from "./scene/land/land";
+import { createTerrainTuner } from "./scene/land/terrainTuner";
 
 const scene = createScene();
 const camera = createCamera();
@@ -23,6 +24,9 @@ const terrainEditor = createTerrainEditor({
   controls,
   renderer,
 });
+
+const land = scene.getObjectByName("land");
+createTerrainTuner(land);
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -41,8 +45,7 @@ function animate() {
   const ocean = scene.getObjectByName("ocean");
   if (ocean) ocean.material.uniforms.time.value += dt;
 
-  const beachfront = scene.getObjectByName("beachfront");
-  if (beachfront) updateBeachfront(beachfront, dt);
+  if (land) updateLand(land, dt);
 
   renderer.render(scene, camera);
 }

@@ -29,7 +29,7 @@ export function createHillTool({
     activeTool: HILL_TOOL_OFF,
     size: 8,
     hardness: 0.3,
-    strength: 4,
+    strength: 10,
     smoothness: 5,
   };
 
@@ -83,6 +83,12 @@ export function createHillTool({
   );
 
   window.addEventListener("pointerup", () => {
+    if (isPainting) {
+      // Bounding sphere only matters for raycaster culling; a single recompute
+      // at stroke end keeps raycasting accurate without paying the cost on
+      // every paint frame.
+      land.geometry.computeBoundingSphere();
+    }
     isPainting = false;
   });
 
@@ -124,7 +130,7 @@ export function createHillTool({
     const hitLocal = land.worldToLocal(lastHitWorld.clone());
     const direction =
       state.activeTool === HILL_TOOL_HILL_DOWN ||
-      state.activeTool === HILL_TOOL_LEVEL_DOWN
+        state.activeTool === HILL_TOOL_LEVEL_DOWN
         ? -1
         : 1;
     const params = {
@@ -151,6 +157,7 @@ export function createHillTool({
     setActiveTool,
     setOnActiveToolChange,
     isActive: () => state.activeTool !== HILL_TOOL_OFF,
+    isPainting: () => isPainting,
     update,
   };
 }
