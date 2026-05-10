@@ -71,12 +71,16 @@ export function createObjectTool({
     const numCols = widthSegments + 1;
     const halfW = width / 2;
     const halfH = height / 2;
+    const offsetX = land.position.x;
+    const offsetZ = land.position.z;
     const hw = (cols * GRID_CELL_SIZE) / 2;
     const hd = (rows * GRID_CELL_SIZE) / 2;
-    const ixMin = Math.max(0, Math.floor((cx - hw + halfW) / cw));
-    const ixMax = Math.min(widthSegments, Math.ceil((cx + hw + halfW) / cw));
-    const iyMin = Math.max(0, Math.floor((cz - hd + halfH) / ch));
-    const iyMax = Math.min(heightSegments, Math.ceil((cz + hd + halfH) / ch));
+    const lcx = cx - offsetX;
+    const lcz = cz - offsetZ;
+    const ixMin = Math.max(0, Math.floor((lcx - hw + halfW) / cw));
+    const ixMax = Math.min(widthSegments, Math.ceil((lcx + hw + halfW) / cw));
+    const iyMin = Math.max(0, Math.floor((lcz - hd + halfH) / ch));
+    const iyMax = Math.min(heightSegments, Math.ceil((lcz + hd + halfH) / ch));
     for (let iy = iyMin; iy <= iyMax; iy++) {
       for (let ix = ixMin; ix <= ixMax; ix++) {
         positions.setZ(iy * numCols + ix, targetH);
@@ -84,6 +88,7 @@ export function createObjectTool({
     }
     positions.needsUpdate = true;
     land.geometry.computeVertexNormals();
+    land.geometry.computeBoundingSphere();
   }
 
   // Placement helpers

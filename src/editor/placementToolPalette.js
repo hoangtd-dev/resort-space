@@ -6,14 +6,20 @@ const PLACEMENT_OFF = "off";
 const PLACEMENT_BUILDINGS = "buildings";
 const PLACEMENT_TREES = "trees";
 const PLACEMENT_PATH = "path";
+const PLACEMENT_SPRAY = "spray";
+const PLACEMENT_CONCRETE = "concrete";
 
 export function createPlacementToolPalette({
   controls,
   pathState,
   objectState,
+  sprayState,
+  concreteState,
   placementState,
   onPathTypeChange,
   onObjectTypeChange,
+  onSprayTypeChange,
+  onConcreteCancel,
   onActivate,
 }) {
   const buildings = Object.entries(OBJECT_CONFIGS)
@@ -27,6 +33,8 @@ export function createPlacementToolPalette({
     label: c.label,
     thumb: c.thumb,
   }));
+  const sprayPaths = paths.filter((p) => p.key !== "water");
+  const concreteAssets = [{ key: "concrete", label: "Concrete", thumb: null }];
 
   const TOOLS = [
     {
@@ -44,11 +52,25 @@ export function createPlacementToolPalette({
       mode: "object",
     },
     {
+      id: PLACEMENT_CONCRETE,
+      label: "Concrete Path",
+      icon: concreteIcon(),
+      assets: concreteAssets,
+      mode: "concrete",
+    },
+    {
       id: PLACEMENT_PATH,
-      label: "Paths",
+      label: "Paths (tile)",
       icon: pathIcon(),
       assets: paths,
       mode: "path",
+    },
+    {
+      id: PLACEMENT_SPRAY,
+      label: "Spray (decoration)",
+      icon: sprayIcon(),
+      assets: sprayPaths,
+      mode: "spray",
     },
   ];
 
@@ -116,6 +138,13 @@ export function createPlacementToolPalette({
         objectState.objectType = validKeys[0];
       }
       onObjectTypeChange();
+    } else if (tool.mode === "spray") {
+      if (sprayState && !validKeys.includes(sprayState.pathType)) {
+        sprayState.pathType = validKeys[0];
+      }
+      onSprayTypeChange?.();
+    } else if (tool.mode === "concrete") {
+      // Single asset; nothing to switch.
     } else {
       if (!validKeys.includes(pathState.pathType)) {
         pathState.pathType = validKeys[0];
@@ -131,6 +160,11 @@ export function createPlacementToolPalette({
     if (tool.mode === "object") {
       objectState.objectType = key;
       onObjectTypeChange();
+    } else if (tool.mode === "spray") {
+      if (sprayState) sprayState.pathType = key;
+      onSprayTypeChange?.();
+    } else if (tool.mode === "concrete") {
+      // Single asset.
     } else {
       pathState.pathType = key;
       onPathTypeChange();
@@ -149,14 +183,25 @@ export function createPlacementToolPalette({
       return;
     }
     const selectedKey =
-      tool.mode === "object" ? objectState.objectType : pathState.pathType;
+      tool.mode === "object"
+        ? objectState.objectType
+        : tool.mode === "spray"
+          ? sprayState?.pathType
+          : tool.mode === "concrete"
+            ? "concrete"
+            : pathState.pathType;
     popover.style.display = "block";
     popover.innerHTML = popoverHTML(tool, selectedKey);
     wirePopover(popover, selectAsset);
   }
 
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") deactivate();
+    if (e.key === "Escape") {
+      // Let concrete tool consume Esc when it has an in-progress polyline.
+      const tool = TOOLS.find((t) => t.id === paletteState.activeBubble);
+      if (tool?.mode === "concrete" && onConcreteCancel?.()) return;
+      deactivate();
+    }
   });
 
   render();
@@ -183,10 +228,15 @@ function popoverHTML(tool, selectedKey) {
     })
     .join("");
 
+  const hint =
+    tool.mode === "concrete"
+      ? "Click to add waypoint · Enter to commit · Backspace to undo · Esc to cancel"
+      : "Click terrain to place · Esc to exit";
+
   return `
     <div class="placement-popover-header">
       <span class="placement-popover-title">${tool.label}</span>
-      <span class="placement-popover-hint">Click terrain to place · Esc to exit</span>
+      <span class="placement-popover-hint">${hint}</span>
     </div>
     <div class="placement-grid">${items}</div>
     <div class="placement-popover-arrow"></div>
@@ -227,5 +277,27 @@ function pathIcon() {
     <path d="M9 26 L12 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
     <path d="M14 18 L17 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
     <path d="M19 11 L22 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function concreteIcon() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M4 26 L12 14 L18 18 L28 6" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+    <circle cx="4" cy="26" r="2" fill="currentColor"/>
+    <circle cx="12" cy="14" r="2" fill="currentColor"/>
+    <circle cx="18" cy="18" r="2" fill="currentColor"/>
+    <circle cx="28" cy="6" r="2" fill="currentColor"/>
+  </svg>`;
+}
+
+function sprayIcon() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="6" y="11" width="10" height="14" rx="1" fill="currentColor" opacity="0.55"/>
+    <rect x="9" y="6" width="4" height="5" fill="currentColor" opacity="0.55"/>
+    <circle cx="22" cy="10" r="1.2" fill="currentColor"/>
+    <circle cx="25" cy="13" r="1.6" fill="currentColor" opacity="0.7"/>
+    <circle cx="22" cy="16" r="1.2" fill="currentColor" opacity="0.5"/>
+    <circle cx="26" cy="17" r="1" fill="currentColor" opacity="0.4"/>
+    <circle cx="24" cy="20" r="1.4" fill="currentColor" opacity="0.6"/>
   </svg>`;
 }

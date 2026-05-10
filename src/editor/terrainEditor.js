@@ -4,14 +4,19 @@ import { GRID_CELL_SIZE } from "./snapGrid";
 import { createHillTool, HILL_TOOL_OFF } from "./hillTool";
 import { createHillToolPalette } from "./hillToolPalette";
 import { createPathTool } from "./pathTool";
+import { createSprayPathTool } from "./sprayPathTool";
+import { createConcretePathTool } from "./concretePathTool";
 import { createObjectTool } from "./objectTool";
 import { createPlacementToolPalette } from "./placementToolPalette";
-import { applyDefaultTerrain } from "../scene/land/defaultTerrain";
+import { applyLandTerrain } from "../scene/land/land";
+import { syncTreeHeights } from "../scene/trees/trees";
 import { DEFAULT_PATHS, DEFAULT_OBJECTS } from "../scene/land/defaultLayout";
 
 export function createTerrainEditor({ scene, camera, controls, renderer }) {
   const land = scene.getObjectByName("land");
-  if (!land) throw new Error("terrainEditor: scene has no object named 'land'");
+  if (!land)
+    throw new Error("terrainEditor: scene has no object named 'land'");
+  const trees = scene.getObjectByName("trees");
 
   // Shared mutable sampler — recreated on resize
   let sampleHeight = makeHeightSampler(land);
@@ -47,7 +52,25 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     scene,
     occupiedCells,
     getSampleHeight,
-    getHalfSize: () => land.geometry.parameters.width / 2,
+    getHalfSize: () =>
+      Math.min(
+        land.geometry.parameters.width,
+        land.geometry.parameters.height,
+      ) / 2,
+  });
+  const sprayPathTool = createSprayPathTool({
+    scene,
+    land,
+    getSampleHeight,
+    getHalfSize: () =>
+      Math.min(
+        land.geometry.parameters.width,
+        land.geometry.parameters.height,
+      ) / 2,
+  });
+  const concretePathTool = createConcretePathTool({
+    scene,
+    getSampleHeight,
   });
   const objectTool = createObjectTool({
     scene,
@@ -60,9 +83,17 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     controls,
     pathState: pathTool.pathState,
     objectState: objectTool.objectState,
+    sprayState: sprayPathTool.sprayState,
+    concreteState: concretePathTool.concreteState,
     placementState,
     onPathTypeChange: () => pathTool.refreshPreviewMaterial(),
     onObjectTypeChange: () => objectTool.refreshFootprint(),
+    onSprayTypeChange: () => {},
+    onConcreteCancel: () => {
+      if (!concretePathTool.isDrafting()) return false;
+      concretePathTool.cancelDraft();
+      return true;
+    },
     onActivate: () => hillTool.setActiveTool(HILL_TOOL_OFF),
   });
 
@@ -114,6 +145,10 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
         deleteAtPointer();
       } else if (placementState.mode === "object") {
         objectTool.placeObject(lastHitWorld.x, lastHitWorld.z);
+      } else if (placementState.mode === "spray") {
+        sprayPathTool.spray(lastHitWorld.x, lastHitWorld.z);
+      } else if (placementState.mode === "concrete") {
+        concretePathTool.addWaypoint(lastHitWorld.x, lastHitWorld.z);
       } else {
         pathTool.setPathAt(lastHitWorld.x, lastHitWorld.z);
       }
@@ -121,27 +156,57 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     }
   });
   window.addEventListener("pointerup", () => {
-    if (!isPointerDown) return;
-    isPointerDown = false;
-    pathTool.endStroke();
+    const wasHillPainting = hillTool.isPainting();
+    if (isPointerDown) {
+      isPointerDown = false;
+      pathTool.endStroke();
+    }
+    if (wasHillPainting && trees) syncTreeHeights(trees, sampleHeight);
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (placementState.mode !== "concrete" || !placementState.active) return;
+    if (e.key === "Enter") {
+      if (concretePathTool.commitDraft()) e.preventDefault();
+    } else if (e.key === "Backspace") {
+      if (concretePathTool.isDrafting()) {
+        concretePathTool.undoLastWaypoint();
+        e.preventDefault();
+      }
+    }
   });
 
   const clock = new THREE.Clock();
 
   // Terrain helpers
   function resetTerrain() {
-    applyDefaultTerrain(land);
+    applyLandTerrain(land);
     pathTool.clearTiles();
   }
 
   function clearAll() {
     pathTool.clearTiles();
+    sprayPathTool.clearAll();
+    concretePathTool.clearAll();
     objectTool.clearObjects();
   }
 
   function deleteAtPointer() {
     if (placementState.mode === "path") {
       pathTool.removePathAt(lastHitWorld.x, lastHitWorld.z);
+      return;
+    }
+    if (placementState.mode === "spray") {
+      sprayPathTool.spray(lastHitWorld.x, lastHitWorld.z, { erase: true });
+      return;
+    }
+    if (placementState.mode === "concrete") {
+      const concreteHits = raycaster.intersectObjects(
+        concretePathTool.committedGroup.children,
+        true,
+      );
+      const hit = concreteHits[0];
+      if (hit) concretePathTool.removeByHitObject(hit.object);
       return;
     }
 
@@ -201,6 +266,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     // Remove only items that now fall outside the new land bounds.
     const half = newSize / 2;
     pathTool.removeTilesOutOfRange(half);
+    sprayPathTool.rebuildForLandResize();
     objectTool.removeObjectsOutOfRange(half);
   }
 
@@ -225,9 +291,15 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
       if (hasHit) lastHitWorld.copy(hits[0].point);
     }
 
+    sprayPathTool.syncOverlayHeights();
     pathTool.updatePreview({ hasHit, lastHitWorld, placementState });
     objectTool.updatePreview({ hasHit, lastHitWorld, placementState });
+    sprayPathTool.updateCursor({ hasHit, lastHitWorld, placementState });
+    concretePathTool.updateGhost({ hasHit, lastHitWorld, placementState });
     hillTool.update(dt, { hasHit, lastHitWorld });
+    if (hillTool.isPainting() && trees) {
+      syncTreeHeights(trees, sampleHeight);
+    }
 
     if (
       isPointerDown &&
@@ -241,6 +313,18 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
       } else {
         pathTool.setPathAt(lastHitWorld.x, lastHitWorld.z);
       }
+    }
+
+    if (
+      isPointerDown &&
+      hasHit &&
+      placementState.active &&
+      placementState.mode === "spray" &&
+      !hillTool.isActive()
+    ) {
+      sprayPathTool.spray(lastHitWorld.x, lastHitWorld.z, {
+        erase: placementState.action === "delete",
+      });
     }
   }
 
@@ -258,10 +342,15 @@ function makeHeightSampler(land) {
   const cols = widthSegments + 1;
   const halfW = width / 2;
   const halfH = height / 2;
+  const offsetX = land.position.x;
+  const offsetY = land.position.y;
+  const offsetZ = land.position.z;
 
   return function sample(worldX, worldZ) {
-    const ixF = (worldX + halfW) / cw;
-    const iyF = (halfH + worldZ) / ch;
+    const lx = worldX - offsetX;
+    const lz = worldZ - offsetZ;
+    const ixF = (lx + halfW) / cw;
+    const iyF = (halfH + lz) / ch;
     if (ixF < 0 || ixF >= widthSegments) return 0;
     if (iyF < 0 || iyF >= heightSegments) return 0;
     const ix = Math.floor(ixF);
@@ -272,6 +361,8 @@ function makeHeightSampler(land) {
     const z10 = positions.getZ(iy * cols + ix + 1);
     const z01 = positions.getZ((iy + 1) * cols + ix);
     const z11 = positions.getZ((iy + 1) * cols + ix + 1);
-    return (z00 * (1 - u) + z10 * u) * (1 - v) + (z01 * (1 - u) + z11 * u) * v;
+    const localZ =
+      (z00 * (1 - u) + z10 * u) * (1 - v) + (z01 * (1 - u) + z11 * u) * v;
+    return localZ + offsetY;
   };
 }
