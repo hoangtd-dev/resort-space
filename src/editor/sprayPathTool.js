@@ -22,10 +22,11 @@ export function createSprayPathTool({ scene, land, getSampleHeight, getHalfSize 
 
   for (const type of SPRAY_PATH_TYPES) {
     const { canvas, ctx, texture } = createMaskCanvas();
-    masks.set(type, { canvas, ctx, texture });
+    masks.set(type, { canvas, ctx, texture, hasContent: false });
 
     const overlay = createOverlayMesh(land, type, texture);
     overlay.name = `sprayPath:${type}`;
+    overlay.userData.landVersion = land.geometry.attributes.position.version;
     overlays.set(type, overlay);
     scene.add(overlay);
   }
@@ -34,17 +35,18 @@ export function createSprayPathTool({ scene, land, getSampleHeight, getHalfSize 
   const cursor = createCursorRing();
   scene.add(cursor);
 
-  let landGeomVersion = -1;
-
   function syncOverlayHeights() {
     const landPos = land.geometry.attributes.position;
-    if (landPos.version === landGeomVersion) return;
-    landGeomVersion = landPos.version;
+    for (const [type, overlay] of overlays) {
+      // Only spend cycles syncing overlays that the user has actually painted
+      // on. Empty overlays render fully transparent — terrain drift on them is
+      // invisible.
+      if (!masks.get(type).hasContent) continue;
+      if (overlay.userData.landVersion === landPos.version) continue;
+      overlay.userData.landVersion = landPos.version;
 
-    for (const overlay of overlays.values()) {
       const op = overlay.geometry.attributes.position;
       if (op.count !== landPos.count) {
-        // Geometry size changed — rebuild from new land geometry.
         overlay.geometry.dispose();
         overlay.geometry = land.geometry.clone();
       } else {
@@ -58,10 +60,11 @@ export function createSprayPathTool({ scene, land, getSampleHeight, getHalfSize 
   }
 
   function rebuildForLandResize() {
-    landGeomVersion = -1;
+    const v = land.geometry.attributes.position.version;
     for (const overlay of overlays.values()) {
       overlay.geometry.dispose();
       overlay.geometry = land.geometry.clone();
+      overlay.userData.landVersion = v;
     }
   }
 
@@ -91,12 +94,14 @@ export function createSprayPathTool({ scene, land, getSampleHeight, getHalfSize 
     ctx.restore();
 
     texture.needsUpdate = true;
+    if (!erase) mask.hasContent = true;
   }
 
   function clearAll() {
-    for (const { ctx, texture } of masks.values()) {
-      ctx.clearRect(0, 0, MASK_RES, MASK_RES);
-      texture.needsUpdate = true;
+    for (const mask of masks.values()) {
+      mask.ctx.clearRect(0, 0, MASK_RES, MASK_RES);
+      mask.texture.needsUpdate = true;
+      mask.hasContent = false;
     }
   }
 

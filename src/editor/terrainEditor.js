@@ -8,13 +8,15 @@ import { createSprayPathTool } from "./sprayPathTool";
 import { createConcretePathTool } from "./concretePathTool";
 import { createObjectTool } from "./objectTool";
 import { createPlacementToolPalette } from "./placementToolPalette";
-import { applyBeachfrontTerrain } from "../scene/beachfront/beachfront";
+import { applyLandTerrain } from "../scene/land/land";
+import { syncTreeHeights } from "../scene/trees/trees";
 import { DEFAULT_PATHS, DEFAULT_OBJECTS } from "../scene/land/defaultLayout";
 
 export function createTerrainEditor({ scene, camera, controls, renderer }) {
-  const land = scene.getObjectByName("beachfront");
+  const land = scene.getObjectByName("land");
   if (!land)
-    throw new Error("terrainEditor: scene has no object named 'beachfront'");
+    throw new Error("terrainEditor: scene has no object named 'land'");
+  const trees = scene.getObjectByName("trees");
 
   // Shared mutable sampler — recreated on resize
   let sampleHeight = makeHeightSampler(land);
@@ -154,9 +156,12 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     }
   });
   window.addEventListener("pointerup", () => {
-    if (!isPointerDown) return;
-    isPointerDown = false;
-    pathTool.endStroke();
+    const wasHillPainting = hillTool.isPainting();
+    if (isPointerDown) {
+      isPointerDown = false;
+      pathTool.endStroke();
+    }
+    if (wasHillPainting && trees) syncTreeHeights(trees, sampleHeight);
   });
 
   window.addEventListener("keydown", (e) => {
@@ -175,7 +180,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   // Terrain helpers
   function resetTerrain() {
-    applyBeachfrontTerrain(land);
+    applyLandTerrain(land);
     pathTool.clearTiles();
   }
 
@@ -292,6 +297,9 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     sprayPathTool.updateCursor({ hasHit, lastHitWorld, placementState });
     concretePathTool.updateGhost({ hasHit, lastHitWorld, placementState });
     hillTool.update(dt, { hasHit, lastHitWorld });
+    if (hillTool.isPainting() && trees) {
+      syncTreeHeights(trees, sampleHeight);
+    }
 
     if (
       isPointerDown &&
