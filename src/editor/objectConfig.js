@@ -15,14 +15,6 @@ export const OBJECT_CONFIGS = {
     cols: 1,
     rows: 1,
   },
-  asia_building: {
-    label: "Asia Building",
-    category: "building",
-    path: "/materials/asia_building/scene.gltf",
-    thumb: "/materials/asia_building/textures/build_01_baseColor.jpeg",
-    cols: 2,
-    rows: 2,
-  },
   dakota_building: {
     label: "Dakota Building",
     category: "building",
@@ -53,21 +45,13 @@ export const OBJECT_CONFIGS = {
     category: "building",
     path: "/materials/swimming_pool.glb",
     thumb: null,
-    cols: 4,  // 20 units wide — proper resort centrepiece
+    cols: 4,
     rows: 3,
   },
   inflatable_pool: {
     label: "Inflatable Pool",
     category: "building",
     path: "/materials/inflatable_pool.glb",
-    thumb: null,
-    cols: 2,
-    rows: 2,
-  },
-  beach_kit: {
-    label: "Beach Kit",
-    category: "building",
-    path: "/materials/beach_kit.glb",
     thumb: null,
     cols: 2,
     rows: 2,
@@ -101,64 +85,16 @@ export const OBJECT_CONFIGS = {
     category: "building",
     path: "/materials/simple_wooden_pier_or_dock.glb",
     thumb: null,
-    cols: 3,  // 15 wide
-    rows: 6,  // 30 deep — reaches into water from beach edge
-  },
-  zsolnay_fountain: {
-    label: "Fountain",
-    category: "building",
-    path: "/materials/zsolnay_fountain.glb",
-    thumb: null,
-    cols: 2,
-    rows: 2,
-  },
-  airport_pack_total: {
-    label: "Airport",
-    category: "building",
-    path: "/materials/airport_pack_total.glb",
-    thumb: null,
-    cols: 20, // 100 units wide — proper island airport scale
-    rows: 12, // 60 units deep
+    cols: 3,
+    rows: 6,
   },
   road: {
     label: "Road",
     category: "building",
     path: "/materials/road.glb",
     thumb: null,
-    cols: 6,  // 30-unit segment — long enough to chain visually
+    cols: 6,
     rows: 2,
-  },
-  road_pack: {
-    label: "Road Pack",
-    category: "building",
-    path: "/materials/road_pack.glb",
-    thumb: null,
-    cols: 10, // 50×50 central hub
-    rows: 10,
-  },
-  road_template: {
-    label: "Road (Curved)",
-    category: "building",
-    path: "/materials/road_template.glb",
-    thumb: null,
-    cols: 5,
-    rows: 5,
-  },
-  low_road: {
-    label: "Low Road",
-    category: "building",
-    path: "/materials/low_road.glb",
-    thumb: null,
-    cols: 6,  // same length as road for consistent look
-    rows: 2,
-  },
-  cartoon_car: {
-    label: "Car",
-    category: "tree",
-    path: "/materials/cartoon_car.glb",
-    thumb: null,
-    cols: 1,
-    rows: 1,
   },
   fishing_boat: {
     label: "Fishing Boat",
@@ -175,13 +111,5 @@ export const OBJECT_CONFIGS = {
     thumb: null,
     cols: 2,
     rows: 3,
-  },
-  water_fountain: {
-    label: "Water Fountain",
-    category: "building",
-    path: "/materials/water_fountain.glb",
-    thumb: null,
-    cols: 2,
-    rows: 2,
   },
 };
