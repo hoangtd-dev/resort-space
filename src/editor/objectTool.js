@@ -8,6 +8,7 @@ import {
   snapForObject,
   getCoveredCellKeys,
 } from "./snapGrid";
+import { isPlacementAllowed } from "./placementZones";
 
 export function createObjectTool({
   scene,
@@ -177,6 +178,7 @@ export function createObjectTool({
     const entry = loadModel(config);
     if (!entry.loaded) return;
     const { x, z } = snapForObject(worldX, worldZ, config.cols, config.rows);
+    if (!isPlacementAllowed(objectState.objectType, x, z, getSampleHeight())) return;
     const keys = getCoveredCellKeys(x, z, config.cols, config.rows);
     if (keys.some((k) => occupiedCells.has(k))) return;
     keys.forEach((k) => occupiedCells.add(k));
@@ -190,6 +192,7 @@ export function createObjectTool({
     const config = OBJECT_CONFIGS[type];
     if (!config) return;
     const { x, z } = snapForObject(wx, wz, config.cols, config.rows);
+    if (!isPlacementAllowed(type, x, z, getSampleHeight())) return;
     const keys = getCoveredCellKeys(x, z, config.cols, config.rows);
     if (keys.some((k) => occupiedCells.has(k))) return;
     keys.forEach((k) => occupiedCells.add(k));
@@ -216,9 +219,11 @@ export function createObjectTool({
       config.cols,
       config.rows,
     );
-    const blocked = getCoveredCellKeys(x, z, config.cols, config.rows).some(
+    const occupied = getCoveredCellKeys(x, z, config.cols, config.rows).some(
       (k) => occupiedCells.has(k),
     );
+    const zoneBlocked = !isPlacementAllowed(objectState.objectType, x, z, getSampleHeight());
+    const blocked = occupied || zoneBlocked;
     footprintPreview.material.color.setHex(blocked ? 0xff3333 : 0x4488ff);
     footprintPreview.position.set(
       x,

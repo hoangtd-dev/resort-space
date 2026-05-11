@@ -106,6 +106,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !hasHit) return;
     isPointerDown = true;
+    console.log(`wx: ${lastHitWorld.x.toFixed(2)}, wz: ${lastHitWorld.z.toFixed(2)}`);
     // Hill tool captures LMB via its own listener (capture phase) when armed.
     // Skip placement entirely while a hill tool is active.
     if (hillTool.isActive()) return;
