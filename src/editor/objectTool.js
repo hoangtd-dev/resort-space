@@ -9,6 +9,7 @@ import {
   getCoveredCellKeys,
 } from "./snapGrid";
 import { isPlacementAllowed } from "./placementZones";
+import { createInstancer } from "./instancer";
 
 export function createObjectTool({
   scene,
@@ -21,11 +22,8 @@ export function createObjectTool({
 
   const gltfLoader = new GLTFLoader();
   const modelCache = new Map();
+  const instancer = createInstancer(scene);
 
-  // Object layer
-  const objectLayer = new THREE.Group();
-  objectLayer.name = "placedObjects";
-  scene.add(objectLayer);
 
   // Footprint preview mesh
   const footprintPreview = new THREE.Mesh(
@@ -65,6 +63,8 @@ export function createObjectTool({
           }
         }
 
+        instancer.initType(config.path, entry.model);
+
         for (const cb of entry.callbacks) cb();
         entry.callbacks = [];
       });
@@ -95,9 +95,15 @@ export function createObjectTool({
     const blendDist = cw * 3; // world-unit width of the soft blend ring
 
     const ixMin = Math.max(0, Math.floor((cx - hw - blendDist + halfW) / cw));
-    const ixMax = Math.min(widthSegments, Math.ceil((cx + hw + blendDist + halfW) / cw));
+    const ixMax = Math.min(
+      widthSegments,
+      Math.ceil((cx + hw + blendDist + halfW) / cw),
+    );
     const iyMin = Math.max(0, Math.floor((cz - hd - blendDist + halfH) / ch));
-    const iyMax = Math.min(heightSegments, Math.ceil((cz + hd + blendDist + halfH) / ch));
+    const iyMax = Math.min(
+      heightSegments,
+      Math.ceil((cz + hd + blendDist + halfH) / ch),
+    );
 
     for (let iy = iyMin; iy <= iyMax; iy++) {
       for (let ix = ixMin; ix <= ixMax; ix++) {
@@ -124,21 +130,6 @@ export function createObjectTool({
     land.geometry.computeVertexNormals();
   }
 
-  // Placement helpers
-  function spawnInstance(config, wrapper, x, z) {
-    const y = getSampleHeight()(x, z);
-    flattenTerrainUnder(x, z, config.cols, config.rows, y);
-    wrapper.position.set(x, y, z);
-    const instance = modelCache.get(config.path).model.clone(true);
-    instance.traverse((node) => {
-      if (node.isMesh) {
-        node.castShadow = true;
-        node.receiveShadow = true;
-      }
-    });
-    wrapper.add(instance);
-  }
-
   // Public API
   function refreshFootprint() {
     const config = OBJECT_CONFIGS[objectState.objectType];
@@ -148,44 +139,39 @@ export function createObjectTool({
   }
 
   function clearObjects() {
-    for (const child of objectLayer.children) {
-      (child.userData.cellKeys || []).forEach((k) => occupiedCells.delete(k));
-      child.traverse((node) => {
-        if (node.isMesh) node.geometry.dispose();
-      });
-    }
-    objectLayer.clear();
+    occupiedCells.clear();
+    instancer.clear();
+  }
+
+  function removeInstance(im, instanceId) {
+    const hit = instancer.identify(im, instanceId);
+    if (!hit) return false;
+    const cellKeys = instancer.remove(hit.path, hit.idx);
+    if (cellKeys) cellKeys.forEach((k) => occupiedCells.delete(k));
+    return true;
   }
 
   function removeObjectsOutOfRange(halfSize) {
-    const toRemove = [];
-    for (const child of objectLayer.children) {
-      if (Math.abs(child.position.x) > halfSize || Math.abs(child.position.z) > halfSize) {
-        toRemove.push(child);
-      }
-    }
-    for (const child of toRemove) {
-      (child.userData.cellKeys || []).forEach((k) => occupiedCells.delete(k));
-      child.traverse((node) => {
-        if (node.isMesh) node.geometry.dispose();
-      });
-      objectLayer.remove(child);
-    }
+    const freed = instancer.removeWhere(
+      ({ x, z }) => Math.abs(x) > halfSize || Math.abs(z) > halfSize,
+    );
+    freed.forEach((k) => occupiedCells.delete(k));
   }
 
   function placeObject(worldX, worldZ) {
-    const config = OBJECT_CONFIGS[objectState.objectType];
+    const type = objectState.objectType;
+    const config = OBJECT_CONFIGS[type];
     const entry = loadModel(config);
     if (!entry.loaded) return;
     const { x, z } = snapForObject(worldX, worldZ, config.cols, config.rows);
-    if (!isPlacementAllowed(objectState.objectType, x, z, getSampleHeight())) return;
+    if (!isPlacementAllowed(type, x, z, getSampleHeight())) return;
     const keys = getCoveredCellKeys(x, z, config.cols, config.rows);
     if (keys.some((k) => occupiedCells.has(k))) return;
     keys.forEach((k) => occupiedCells.add(k));
-    const wrapper = new THREE.Group();
-    wrapper.userData.cellKeys = keys;
-    objectLayer.add(wrapper);
-    spawnInstance(config, wrapper, x, z);
+    const y = getSampleHeight()(x, z);
+    if (config.cols > 1 || config.rows > 1)
+      flattenTerrainUnder(x, z, config.cols, config.rows, y);
+    instancer.add(config.path, x, y, z, keys);
   }
 
   function placeObjectOfType(type, wx, wz) {
@@ -196,10 +182,12 @@ export function createObjectTool({
     const keys = getCoveredCellKeys(x, z, config.cols, config.rows);
     if (keys.some((k) => occupiedCells.has(k))) return;
     keys.forEach((k) => occupiedCells.add(k));
-    const wrapper = new THREE.Group();
-    wrapper.userData.cellKeys = keys;
-    objectLayer.add(wrapper);
-    loadModel(config, () => spawnInstance(config, wrapper, x, z));
+    loadModel(config, () => {
+      const y = getSampleHeight()(x, z);
+      if (config.cols > 1 || config.rows > 1)
+        flattenTerrainUnder(x, z, config.cols, config.rows, y);
+      instancer.add(config.path, x, y, z, keys);
+    });
   }
 
   function updatePreview({ hasHit, lastHitWorld, placementState }) {
@@ -222,7 +210,12 @@ export function createObjectTool({
     const occupied = getCoveredCellKeys(x, z, config.cols, config.rows).some(
       (k) => occupiedCells.has(k),
     );
-    const zoneBlocked = !isPlacementAllowed(objectState.objectType, x, z, getSampleHeight());
+    const zoneBlocked = !isPlacementAllowed(
+      objectState.objectType,
+      x,
+      z,
+      getSampleHeight(),
+    );
     const blocked = occupied || zoneBlocked;
     footprintPreview.material.color.setHex(blocked ? 0xff3333 : 0x4488ff);
     footprintPreview.position.set(
@@ -231,23 +224,6 @@ export function createObjectTool({
       z,
     );
     footprintPreview.visible = true;
-  }
-
-  function removeByHitObject(hitObject) {
-    const root = findPlacementRoot(hitObject);
-    if (!root) return false;
-    (root.userData.cellKeys || []).forEach((k) => occupiedCells.delete(k));
-    root.traverse((node) => {
-      if (node.isMesh) node.geometry?.dispose?.();
-    });
-    objectLayer.remove(root);
-    return true;
-  }
-
-  function findPlacementRoot(obj) {
-    let cur = obj;
-    while (cur && cur.parent && cur.parent !== objectLayer) cur = cur.parent;
-    return cur && cur.parent === objectLayer ? cur : null;
   }
 
   // Kick off load for the default object type
@@ -260,10 +236,10 @@ export function createObjectTool({
     clearObjects,
     removeObjectsOutOfRange,
     refreshFootprint,
-    removeByHitObject,
+    removeInstance,
+    getInstancedMeshes: () => instancer.getAllMeshes(),
     updatePreview,
     preview: footprintPreview,
-    objectLayer,
   };
 }
 

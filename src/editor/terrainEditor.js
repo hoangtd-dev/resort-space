@@ -147,13 +147,10 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
       return;
     }
 
-    const objectHits = raycaster.intersectObjects(
-      objectTool.objectLayer.children,
-      true,
-    );
-    const objectHit = objectHits[0];
-    if (!objectHit) return;
-    objectTool.removeByHitObject(objectHit.object);
+    const hits = raycaster.intersectObjects(objectTool.getInstancedMeshes(), false);
+    const hit = hits[0];
+    if (!hit) return;
+    objectTool.removeInstance(hit.object, hit.instanceId);
   }
 
   function resizeLand(newSize) {
