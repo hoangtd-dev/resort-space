@@ -36,3 +36,10 @@ function animate() {
 }
 
 animate();
+
+// ── Splash screen ────────────────────────────────────────────────────────────
+const splash = document.getElementById("splash");
+document.getElementById("splash-btn").addEventListener("click", () => {
+  splash.classList.add("hidden");
+  splash.addEventListener("transitionend", () => splash.remove(), { once: true });
+});
