@@ -10,6 +10,7 @@ import {
 } from "./snapGrid";
 import { isPlacementAllowed } from "./placementZones";
 import { createInstancer } from "./instancer";
+import { OBJECT_SCALES } from "./objectScales";
 
 export function createObjectTool({
   scene,
@@ -171,7 +172,7 @@ export function createObjectTool({
     const y = getSampleHeight()(x, z);
     if (config.cols > 1 || config.rows > 1)
       flattenTerrainUnder(x, z, config.cols, config.rows, y);
-    instancer.add(config.path, x, y, z, keys);
+    instancer.add(config.path, x, y, z, keys, OBJECT_SCALES[type] ?? 1);
   }
 
   function placeObjectOfType(type, wx, wz) {
@@ -186,7 +187,7 @@ export function createObjectTool({
       const y = getSampleHeight()(x, z);
       if (config.cols > 1 || config.rows > 1)
         flattenTerrainUnder(x, z, config.cols, config.rows, y);
-      instancer.add(config.path, x, y, z, keys);
+      instancer.add(config.path, x, y, z, keys, OBJECT_SCALES[type] ?? 1);
     });
   }
 

@@ -29,12 +29,16 @@ export function createInstancer(scene) {
     typeMap.set(path, { meshes, instances: [] });
   }
 
-  function add(path, x, y, z, cellKeys) {
+  function add(path, x, y, z, cellKeys, scale = 1) {
     const data = typeMap.get(path);
     if (!data) return -1;
     const idx = data.instances.length;
     if (idx >= MAX_INSTANCES) return -1;
-    const mat = new THREE.Matrix4().makeTranslation(x, y, z);
+    const mat = new THREE.Matrix4().compose(
+      new THREE.Vector3(x, y, z),
+      new THREE.Quaternion(),
+      new THREE.Vector3(scale, scale, scale),
+    );
     for (const im of data.meshes) {
       im.setMatrixAt(idx, mat);
       im.count = idx + 1;
