@@ -24,6 +24,7 @@ export function createObjectTool({
   const gltfLoader = new GLTFLoader();
   const modelCache = new Map();
   const instancer = createInstancer(scene);
+  let terrainDirty = false;
 
 
   // Footprint preview mesh
@@ -128,6 +129,12 @@ export function createObjectTool({
       }
     }
     positions.needsUpdate = true;
+    terrainDirty = true;
+  }
+
+  function flushTerrainNormals() {
+    if (!terrainDirty) return;
+    terrainDirty = false;
     land.geometry.computeVertexNormals();
   }
 
@@ -169,10 +176,11 @@ export function createObjectTool({
     const keys = getCoveredCellKeys(x, z, config.cols, config.rows);
     if (keys.some((k) => occupiedCells.has(k))) return;
     keys.forEach((k) => occupiedCells.add(k));
+    const scale = OBJECT_SCALES[type] ?? 1;
     const y = getSampleHeight()(x, z);
     if (config.cols > 1 || config.rows > 1)
-      flattenTerrainUnder(x, z, config.cols, config.rows, y);
-    instancer.add(config.path, x, y, z, keys, OBJECT_SCALES[type] ?? 1);
+      flattenTerrainUnder(x, z, config.cols * scale, config.rows * scale, y);
+    instancer.add(config.path, x, y, z, keys, scale);
   }
 
   function placeObjectOfType(type, wx, wz) {
@@ -183,11 +191,12 @@ export function createObjectTool({
     const keys = getCoveredCellKeys(x, z, config.cols, config.rows);
     if (keys.some((k) => occupiedCells.has(k))) return;
     keys.forEach((k) => occupiedCells.add(k));
+    const scale = OBJECT_SCALES[type] ?? 1;
     loadModel(config, () => {
       const y = getSampleHeight()(x, z);
       if (config.cols > 1 || config.rows > 1)
-        flattenTerrainUnder(x, z, config.cols, config.rows, y);
-      instancer.add(config.path, x, y, z, keys, OBJECT_SCALES[type] ?? 1);
+        flattenTerrainUnder(x, z, config.cols * scale, config.rows * scale, y);
+      instancer.add(config.path, x, y, z, keys, scale);
     });
   }
 
@@ -238,6 +247,7 @@ export function createObjectTool({
     removeObjectsOutOfRange,
     refreshFootprint,
     removeInstance,
+    flushTerrainNormals,
     getInstancedMeshes: () => instancer.getAllMeshes(),
     updatePreview,
     preview: footprintPreview,
