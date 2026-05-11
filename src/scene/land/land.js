@@ -12,8 +12,8 @@ export function createLand() {
     LAND_SEGMENTS,
   );
   const material = new THREE.MeshStandardMaterial({
-    color: 0x4a7040,
-    roughness: 0.92,
+    vertexColors: true,
+    roughness: 0.88,
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
