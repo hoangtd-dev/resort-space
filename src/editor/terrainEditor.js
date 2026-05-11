@@ -103,6 +103,19 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   });
+  canvas.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(objectTool.getInstancedMeshes(), false);
+    if (hits.length > 0) {
+      objectTool.removeInstance(hits[0].object, hits[0].instanceId);
+    }
+  });
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !hasHit) return;
     isPointerDown = true;
@@ -226,6 +239,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
     pathTool.updatePreview({ hasHit, lastHitWorld, placementState });
     objectTool.updatePreview({ hasHit, lastHitWorld, placementState });
+    objectTool.flushTerrainNormals();
     hillTool.update(dt, { hasHit, lastHitWorld });
 
     if (
