@@ -16,7 +16,7 @@ export function applyDefaultTerrain(land) {
     }
   }
 
-  smoothTerrain(pos, cols, rows, 2);
+  smoothTerrain(pos, cols, rows, 3);
   pos.needsUpdate = true;
   geo.computeVertexNormals();
   applyVertexColors(land);
@@ -39,6 +39,9 @@ function computeHeight(wx, wz) {
   // Coastal depression — gentle dip toward the front shoreline.
   h -=  1.5 * hill(wx, wz,   0, -30, 90, 50);
 
+  // Broader south beachfront — flattens the coastal face into a wide sandy strip.
+  h -=  0.4 * hill(wx, wz,   0, -90, 120, 35);
+
   h += roughness(wx, wz);
 
   const mask = islandMask(wx, wz);
@@ -60,9 +63,9 @@ function islandMask(wx, wz) {
      8 * Math.cos(angle * 4.7 + 1.6) +
      5 * Math.sin(angle * 6.1 - 0.3);
 
-  // Variable feathering: narrow zones create cliff-like transitions,
+  // Variable feathering: narrower zones are still clifflike but never razor-sharp;
   // wider zones create gradual sandy beaches.
-  const feather = 18 + 10 * Math.sin(angle * 2.5 + 1.0);
+  const feather = 22 + 10 * Math.sin(angle * 2.5 + 1.0); // range 12–32 (was 8–28)
 
   const coastMask = 1.0 - smoothstep(r - feather, r, dist);
   // Right edge: straight vertical border.
@@ -88,20 +91,25 @@ function hill(wx, wz, cx, cz, rx, rz) {
 
 // ─── Terrain smoothing ───────────────────────────────────────────────────────
 
-// Box-filter smoothing pass — eliminates any residual jagged transitions
-// from the height field without eroding hill shape significantly.
+// 9-tap weighted Gaussian smoothing — cardinal neighbours weight 1,
+// diagonal neighbours weight 0.5, centre weight 4. Isotropic kernel
+// eliminates axis-aligned blocky artifacts that a pure box filter leaves.
 function smoothTerrain(pos, cols, rows, iterations) {
   const scratch = new Float32Array(pos.count);
   for (let iter = 0; iter < iterations; iter++) {
     for (let iy = 0; iy < rows; iy++) {
       for (let ix = 0; ix < cols; ix++) {
         const i = iy * cols + ix;
-        let sum = pos.getZ(i) * 4; // centre weighted 4×
+        let sum = pos.getZ(i) * 4;
         let w = 4;
-        if (ix > 0)        { sum += pos.getZ(i - 1);    w++; }
-        if (ix < cols - 1) { sum += pos.getZ(i + 1);    w++; }
-        if (iy > 0)        { sum += pos.getZ(i - cols); w++; }
-        if (iy < rows - 1) { sum += pos.getZ(i + cols); w++; }
+        if (ix > 0)        { sum += pos.getZ(i - 1);    w += 1; }
+        if (ix < cols - 1) { sum += pos.getZ(i + 1);    w += 1; }
+        if (iy > 0)        { sum += pos.getZ(i - cols); w += 1; }
+        if (iy < rows - 1) { sum += pos.getZ(i + cols); w += 1; }
+        if (ix > 0        && iy > 0)        { sum += pos.getZ(i - cols - 1) * 0.5; w += 0.5; }
+        if (ix < cols - 1 && iy > 0)        { sum += pos.getZ(i - cols + 1) * 0.5; w += 0.5; }
+        if (ix > 0        && iy < rows - 1) { sum += pos.getZ(i + cols - 1) * 0.5; w += 0.5; }
+        if (ix < cols - 1 && iy < rows - 1) { sum += pos.getZ(i + cols + 1) * 0.5; w += 0.5; }
         scratch[i] = sum / w;
       }
     }
@@ -139,9 +147,9 @@ function applyVertexColors(land) {
 
     // Height-based colour band.
     let c;
-    if      (h < 0.5) c = lerp3(SAND,  SHORE,  Math.max(0, h / 0.5));
-    else if (h < 3.0) c = lerp3(SHORE, GRASS,  (h - 0.5) / 2.5);
-    else if (h < 9.0) c = lerp3(GRASS, HILL,   (h - 3.0) / 6.0);
+    if      (h < 0.8) c = lerp3(SAND,  SHORE,  Math.max(0, h / 0.8));
+    else if (h < 4.0) c = lerp3(SHORE, GRASS,  (h - 0.8) / 3.2);
+    else if (h < 9.0) c = lerp3(GRASS, HILL,   (h - 4.0) / 5.0);
     else              c = lerp3(HILL,  SUMMIT,  Math.min(1, (h - 9.0) / 6.0));
 
     // Slope overlay: steep faces tint toward rocky grey.

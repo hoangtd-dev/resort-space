@@ -54,6 +54,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     land,
     occupiedCells,
     getSampleHeight,
+    onThumbReady: () => placementPalette?.refresh(),
   });
 
   placementPalette = createPlacementToolPalette({

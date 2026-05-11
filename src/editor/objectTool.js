@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OBJECT_CONFIGS } from "./objectConfig";
+import { generateThumb } from "./thumbGen";
 import {
   GRID_CELL_SIZE,
   PREVIEW_OFFSET,
@@ -13,6 +14,7 @@ export function createObjectTool({
   land,
   occupiedCells,
   getSampleHeight,
+  onThumbReady,
 }) {
   const objectState = { objectType: Object.keys(OBJECT_CONFIGS)[0] };
 
@@ -49,6 +51,19 @@ export function createObjectTool({
         fitModelToFootprint(gltf.scene, config.cols, config.rows);
         entry.model = gltf.scene;
         entry.loaded = true;
+
+        if (!config.thumb) {
+          try {
+            const dataURL = generateThumb(gltf.scene);
+            if (dataURL) {
+              config.thumb = dataURL;
+              onThumbReady?.();
+            }
+          } catch {
+            // Thumbnail generation is non-critical
+          }
+        }
+
         for (const cb of entry.callbacks) cb();
         entry.callbacks = [];
       });
@@ -61,7 +76,10 @@ export function createObjectTool({
     return entry;
   }
 
-  // Terrain flattening
+  // Terrain flattening with feathered blend ring.
+  // Vertices inside the footprint are set to targetH exactly.
+  // Vertices in a 3-cell-wide ring outside the footprint blend smoothly
+  // from targetH back to the existing terrain height, eliminating hard pad edges.
   function flattenTerrainUnder(cx, cz, cols, rows, targetH) {
     const positions = land.geometry.attributes.position;
     const { width, height, widthSegments, heightSegments } =
@@ -73,13 +91,32 @@ export function createObjectTool({
     const halfH = height / 2;
     const hw = (cols * GRID_CELL_SIZE) / 2;
     const hd = (rows * GRID_CELL_SIZE) / 2;
-    const ixMin = Math.max(0, Math.floor((cx - hw + halfW) / cw));
-    const ixMax = Math.min(widthSegments, Math.ceil((cx + hw + halfW) / cw));
-    const iyMin = Math.max(0, Math.floor((cz - hd + halfH) / ch));
-    const iyMax = Math.min(heightSegments, Math.ceil((cz + hd + halfH) / ch));
+    const blendDist = cw * 3; // world-unit width of the soft blend ring
+
+    const ixMin = Math.max(0, Math.floor((cx - hw - blendDist + halfW) / cw));
+    const ixMax = Math.min(widthSegments, Math.ceil((cx + hw + blendDist + halfW) / cw));
+    const iyMin = Math.max(0, Math.floor((cz - hd - blendDist + halfH) / ch));
+    const iyMax = Math.min(heightSegments, Math.ceil((cz + hd + blendDist + halfH) / ch));
+
     for (let iy = iyMin; iy <= iyMax; iy++) {
       for (let ix = ixMin; ix <= ixMax; ix++) {
-        positions.setZ(iy * numCols + ix, targetH);
+        const i = iy * numCols + ix;
+        const vx = (ix / widthSegments - 0.5) * width;
+        const vz = (iy / heightSegments - 0.5) * height;
+        // Distance overflowing outside the footprint rectangle (0 inside).
+        const ox = Math.max(0, Math.abs(vx - cx) - hw);
+        const oz = Math.max(0, Math.abs(vz - cz) - hd);
+
+        if (ox === 0 && oz === 0) {
+          positions.setZ(i, targetH);
+        } else {
+          const d = Math.sqrt(ox * ox + oz * oz);
+          if (d < blendDist) {
+            const t = d / blendDist;
+            const blend = t * t * (3 - 2 * t); // smoothstep 0→1
+            positions.setZ(i, targetH + (positions.getZ(i) - targetH) * blend);
+          }
+        }
       }
     }
     positions.needsUpdate = true;

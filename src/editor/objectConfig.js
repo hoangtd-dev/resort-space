@@ -103,6 +103,7 @@ export const OBJECT_CONFIGS = {
     thumb: null,
     cols: 2,
     rows: 2,
+    hidden: true,
   },
   tow_boat: {
     label: "Tow Boat",

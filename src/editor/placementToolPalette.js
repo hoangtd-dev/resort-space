@@ -17,11 +17,11 @@ export function createPlacementToolPalette({
   onActivate,
 }) {
   const buildings = Object.entries(OBJECT_CONFIGS)
-    .filter(([, c]) => c.category === "building")
-    .map(([key, c]) => ({ key, label: c.label, thumb: c.thumb }));
+    .filter(([, c]) => c.category === "building" && !c.hidden)
+    .map(([key, c]) => ({ key, label: c.label }));
   const trees = Object.entries(OBJECT_CONFIGS)
-    .filter(([, c]) => c.category === "tree")
-    .map(([key, c]) => ({ key, label: c.label, thumb: c.thumb }));
+    .filter(([, c]) => c.category === "tree" && !c.hidden)
+    .map(([key, c]) => ({ key, label: c.label }));
   const paths = Object.entries(PATH_TYPES).map(([key, c]) => ({
     key,
     label: c.label,
@@ -172,9 +172,9 @@ export function createPlacementToolPalette({
 function popoverHTML(tool, selectedKey) {
   const items = tool.assets
     .map((asset) => {
-      const thumbStyle = asset.thumb
-        ? `background-image: url(${asset.thumb})`
-        : "";
+      // Read thumb live from OBJECT_CONFIGS so dynamically generated ones appear
+      const thumb = OBJECT_CONFIGS[asset.key]?.thumb ?? asset.thumb;
+      const thumbStyle = thumb ? `background-image: url(${thumb})` : "";
       return `
         <button type="button" class="placement-thumb ${asset.key === selectedKey ? "selected" : ""}" data-key="${asset.key}">
           <span class="placement-thumb-img" style="${thumbStyle}"></span>

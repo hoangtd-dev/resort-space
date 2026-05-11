@@ -1,23 +1,68 @@
+function svgThumb(svg) {
+  return "data:image/svg+xml;base64," + btoa(svg);
+}
+
 export const PATH_TYPES = {
   rock: {
     label: "Rock Path",
     color: 0xb8b0a0,
-    thumb: "/models/nature/bundle/PathRocks_Diffuse.png",
+    thumb: svgThumb(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+        <rect width="64" height="64" fill="#b8b0a0"/>
+        <ellipse cx="16" cy="22" rx="11" ry="7" fill="#a8a098" stroke="#888078" stroke-width="1"/>
+        <ellipse cx="46" cy="18" rx="10" ry="7" fill="#c0b8a8" stroke="#888078" stroke-width="1"/>
+        <ellipse cx="30" cy="40" rx="13" ry="8" fill="#a8a098" stroke="#888078" stroke-width="1"/>
+        <ellipse cx="12" cy="52" rx="9" ry="6" fill="#c0b8a8" stroke="#888078" stroke-width="1"/>
+        <ellipse cx="52" cy="48" rx="10" ry="7" fill="#b0a898" stroke="#888078" stroke-width="1"/>
+      </svg>`,
+    ),
   },
   grass: {
     label: "Grass",
     color: 0x88c455,
-    thumb: "/textures/paths/grass_path_color.png",
+    thumb: svgThumb(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+        <rect width="64" height="64" fill="#88c455"/>
+        <path d="M8 62 Q9 48 7 36 M16 62 Q18 52 15 40 M24 62 Q26 50 25 38 M32 62 Q33 49 31 37 M40 62 Q42 50 41 38 M48 62 Q50 51 47 39 M56 62 Q58 49 55 37"
+              stroke="#5a9e30" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      </svg>`,
+    ),
   },
   sand: {
     label: "Sand",
     color: 0xe0d070,
-    thumb: "/textures/paths/sand_path_color.png",
+    thumb: svgThumb(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+        <rect width="64" height="64" fill="#e0d070"/>
+        <circle cx="10" cy="12" r="1.4" fill="#c8b850" opacity="0.7"/>
+        <circle cx="24" cy="8"  r="1.2" fill="#c8b850" opacity="0.6"/>
+        <circle cx="38" cy="14" r="1.5" fill="#c8b850" opacity="0.7"/>
+        <circle cx="54" cy="10" r="1.2" fill="#c8b850" opacity="0.6"/>
+        <circle cx="18" cy="26" r="1.3" fill="#c8b850" opacity="0.7"/>
+        <circle cx="34" cy="30" r="1.5" fill="#c8b850" opacity="0.7"/>
+        <circle cx="50" cy="24" r="1.2" fill="#c8b850" opacity="0.6"/>
+        <circle cx="8"  cy="42" r="1.4" fill="#c8b850" opacity="0.7"/>
+        <circle cx="22" cy="46" r="1.2" fill="#c8b850" opacity="0.6"/>
+        <circle cx="44" cy="40" r="1.5" fill="#c8b850" opacity="0.7"/>
+        <circle cx="58" cy="44" r="1.2" fill="#c8b850" opacity="0.6"/>
+        <circle cx="14" cy="56" r="1.3" fill="#c8b850" opacity="0.7"/>
+        <circle cx="36" cy="58" r="1.4" fill="#c8b850" opacity="0.7"/>
+        <circle cx="56" cy="56" r="1.2" fill="#c8b850" opacity="0.6"/>
+      </svg>`,
+    ),
   },
   water: {
     label: "Water",
     color: 0x55aae0,
-    thumb: "/textures/paths/sand_path_normalGL.png",
+    thumb: svgThumb(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+        <rect width="64" height="64" fill="#55aae0"/>
+        <path d="M0 18 Q16 12 32 18 Q48 24 64 18" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
+        <path d="M0 32 Q16 26 32 32 Q48 38 64 32" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
+        <path d="M0 46 Q16 40 32 46 Q48 52 64 46" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
+        <path d="M0 58 Q16 52 32 58 Q48 64 64 58" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
+      </svg>`,
+    ),
   },
 };
 

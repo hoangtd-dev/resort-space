@@ -4,10 +4,10 @@ import { createLand } from "./land/land";
 import { createLights } from "./lights/lights";
 import { createOcean } from "./ocean/ocean";
 import { createGrid } from "./grid/grid";
+import { createPaths } from "./paths/paths";
 
 export function createScene() {
   const scene = new THREE.Scene();
-
 
   scene.background = new THREE.Color(0x9bbcd4);
 
@@ -15,7 +15,13 @@ export function createScene() {
   scene.fog = new THREE.FogExp2(0xb0c8d8, 0.005);
 
   scene.add(createOcean());
-  scene.add(createLand());
+
+  const land = createLand();
+  scene.add(land);
+
+  // Paths sample terrain height — must come after land is set up
+  scene.add(createPaths(land));
+
   scene.add(createGrid());
 
   for (const light of createLights()) {
