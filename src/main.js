@@ -1,5 +1,6 @@
 import "./style.css";
 
+import { DefaultLoadingManager } from "three";
 import { createScene } from "./scene/scene";
 import { createCamera } from "./camera/camera";
 import { createRenderer } from "./renderer/renderer";
@@ -39,7 +40,22 @@ animate();
 
 // ── Splash screen ────────────────────────────────────────────────────────────
 const splash = document.getElementById("splash");
-document.getElementById("splash-btn").addEventListener("click", () => {
-  splash.classList.add("hidden");
-  splash.addEventListener("transitionend", () => splash.remove(), { once: true });
-});
+const splashStart = Date.now();
+const MIN_SPLASH_MS = 3200; // minimum display so the animation breathes
+let splashDismissed = false;
+
+function dismissSplash() {
+  if (splashDismissed) return;
+  splashDismissed = true;
+  const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - splashStart));
+  setTimeout(() => {
+    splash.classList.add("hidden");
+    splash.addEventListener("transitionend", () => splash.remove(), { once: true });
+  }, wait);
+}
+
+// Primary trigger: fired by THREE once all TextureLoader / GLTFLoader items resolve.
+DefaultLoadingManager.onLoad = dismissSplash;
+
+// Fallback: if nothing async was loaded (all procedural), dismiss after the minimum wait.
+setTimeout(dismissSplash, MIN_SPLASH_MS + 1500);

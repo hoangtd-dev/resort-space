@@ -9,11 +9,11 @@ body {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: linear-gradient(160deg, #0a2a4a 0%, #1565a8 50%, #1e90c8 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.8s ease;
+  overflow: hidden;
+  transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #splash.hidden {
@@ -21,44 +21,120 @@ body {
   pointer-events: none;
 }
 
+/* Blurred island screenshot — oversized to hide blur-edge artifacts */
+#splash-bg {
+  position: absolute;
+  inset: -6%;
+  background: url("/images/island_screenshot.png") center / cover no-repeat;
+  filter: blur(24px) saturate(0.9) brightness(0.85);
+  transform: scale(1.04);
+}
+
+/* Dark cinematic overlay */
+#splash-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    170deg,
+    rgba(4, 14, 30, 0.74) 0%,
+    rgba(6, 22, 54, 0.62) 55%,
+    rgba(4, 18, 42, 0.78) 100%
+  );
+}
+
+/* Glassmorphism content card — enters with a slow rise */
 #splash-content {
+  position: relative;
+  z-index: 1;
   text-align: center;
   color: #fff;
   user-select: none;
+  padding: 60px 80px 56px;
+  border-radius: 20px;
+  background: rgba(6, 20, 44, 0.40);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow:
+    0 12px 56px rgba(0, 0, 0, 0.50),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  animation: splashContentIn 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes splashContentIn {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Thin horizon line above the title */
+#splash-rule {
+  width: 44px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(160, 210, 255, 0.65),
+    transparent
+  );
+  margin: 0 auto 30px;
 }
 
 #splash-title {
-  font-size: 3rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  margin: 0 0 0.4rem;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+  font-size: 4rem;
+  font-weight: 200;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin: 0 0 0.5rem;
+  line-height: 1.1;
+  background: linear-gradient(160deg, #ffffff 35%, rgba(155, 205, 255, 0.88) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 28px rgba(0, 0, 0, 0.55));
 }
 
-#splash-btn {
-  padding: 14px 44px;
-  font-size: 1rem;
-  font-family: inherit;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: #0a2a4a;
-  background: #fff;
-  border: none;
-  border-radius: 50px;
-  cursor: pointer;
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.25);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+#splash-subtitle {
+  font-size: 0.95rem;
+  font-weight: 300;
+  font-style: italic;
+  letter-spacing: 0.14em;
+  color: rgba(190, 220, 255, 0.70);
+  margin: 0 0 2.6rem;
 }
 
-#splash-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+/* Three-dot wave loader */
+#splash-loader {
+  display: flex;
+  gap: 9px;
+  justify-content: center;
+  align-items: center;
 }
 
-#splash-btn:active {
-  transform: translateY(0);
+#splash-loader span {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(160, 210, 255, 0.80);
+  animation: splashDot 1.5s ease-in-out infinite;
+}
+
+#splash-loader span:nth-child(2) { animation-delay: 0.22s; }
+#splash-loader span:nth-child(3) { animation-delay: 0.44s; }
+
+@keyframes splashDot {
+  0%, 65%, 100% { transform: scale(0.65); opacity: 0.22; }
+  32%            { transform: scale(1.25); opacity: 1; }
+}
+
+@media (max-width: 480px) {
+  #splash-content {
+    padding: 44px 32px 40px;
+    margin: 0 20px;
+    border-radius: 16px;
+  }
+  #splash-title { font-size: 2.6rem; }
 }
 
 .path-toolbar {

@@ -28,39 +28,18 @@ export const PATH_TYPES = {
       </svg>`,
     ),
   },
-  sand: {
-    label: "Sand",
-    color: 0xe0d070,
+  road: {
+    label: "Road",
+    color: 0xb8b8b8,
     thumb: svgThumb(
       `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-        <rect width="64" height="64" fill="#e0d070"/>
-        <circle cx="10" cy="12" r="1.4" fill="#c8b850" opacity="0.7"/>
-        <circle cx="24" cy="8"  r="1.2" fill="#c8b850" opacity="0.6"/>
-        <circle cx="38" cy="14" r="1.5" fill="#c8b850" opacity="0.7"/>
-        <circle cx="54" cy="10" r="1.2" fill="#c8b850" opacity="0.6"/>
-        <circle cx="18" cy="26" r="1.3" fill="#c8b850" opacity="0.7"/>
-        <circle cx="34" cy="30" r="1.5" fill="#c8b850" opacity="0.7"/>
-        <circle cx="50" cy="24" r="1.2" fill="#c8b850" opacity="0.6"/>
-        <circle cx="8"  cy="42" r="1.4" fill="#c8b850" opacity="0.7"/>
-        <circle cx="22" cy="46" r="1.2" fill="#c8b850" opacity="0.6"/>
-        <circle cx="44" cy="40" r="1.5" fill="#c8b850" opacity="0.7"/>
-        <circle cx="58" cy="44" r="1.2" fill="#c8b850" opacity="0.6"/>
-        <circle cx="14" cy="56" r="1.3" fill="#c8b850" opacity="0.7"/>
-        <circle cx="36" cy="58" r="1.4" fill="#c8b850" opacity="0.7"/>
-        <circle cx="56" cy="56" r="1.2" fill="#c8b850" opacity="0.6"/>
-      </svg>`,
-    ),
-  },
-  water: {
-    label: "Water",
-    color: 0x55aae0,
-    thumb: svgThumb(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-        <rect width="64" height="64" fill="#55aae0"/>
-        <path d="M0 18 Q16 12 32 18 Q48 24 64 18" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
-        <path d="M0 32 Q16 26 32 32 Q48 38 64 32" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
-        <path d="M0 46 Q16 40 32 46 Q48 52 64 46" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
-        <path d="M0 58 Q16 52 32 58 Q48 64 64 58" stroke="#2d88c0" stroke-width="2.2" fill="none"/>
+        <rect width="64" height="64" fill="#686868"/>
+        <line x1="0" y1="20" x2="64" y2="20" stroke="#888" stroke-width="1.5"/>
+        <line x1="0" y1="44" x2="64" y2="44" stroke="#888" stroke-width="1.5"/>
+        <line x1="32" y1="0"  x2="32" y2="8"  stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <line x1="32" y1="18" x2="32" y2="26" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <line x1="32" y1="36" x2="32" y2="44" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <line x1="32" y1="54" x2="32" y2="62" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
       </svg>`,
     ),
   },

@@ -11,8 +11,9 @@ const textureCache = new Map();
 const CHUNK_CELLS = 20;
 const PATH_SUBDIV = 5;
 
-export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfSize }) {
+export function createPathTool({ scene, land, occupiedCells, getSampleHeight, getHalfSize }) {
   const pathState = { pathType: "rock" };
+  let terrainNormalsDirty = false;
 
   const pathCells = new Map();
   const chunkStore = new Map();
@@ -257,6 +258,7 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
     pathCells.set(cellKey, type);
     occupiedCells.add(occupiedKey);
     markCellAndNeighborsDirty(i, j);
+    if (type === "road") flattenRoadTile(x, z);
     return true;
   }
 
@@ -269,10 +271,57 @@ export function createPathTool({ scene, occupiedCells, getSampleHeight, getHalfS
     return true;
   }
 
+  // Flatten terrain under a single road tile — same smoothstep-blend algorithm
+  // as objectTool's flattenTerrainUnder, scoped to one GRID_CELL_SIZE × GRID_CELL_SIZE cell.
+  function flattenRoadTile(cx, cz) {
+    if (!land) return;
+    const positions = land.geometry.attributes.position;
+    const { width, height, widthSegments, heightSegments } = land.geometry.parameters;
+    const cw = width  / widthSegments;
+    const ch = height / heightSegments;
+    const numCols = widthSegments + 1;
+    const half      = GRID_CELL_SIZE / 2;
+    const blendDist = cw * 3;
+    const targetH   = getSampleHeight()(cx, cz);
+
+    const ixMin = Math.max(0, Math.floor((cx - half - blendDist + width  / 2) / cw));
+    const ixMax = Math.min(widthSegments,  Math.ceil((cx + half + blendDist + width  / 2) / cw));
+    const iyMin = Math.max(0, Math.floor((cz - half - blendDist + height / 2) / ch));
+    const iyMax = Math.min(heightSegments, Math.ceil((cz + half + blendDist + height / 2) / ch));
+
+    for (let iy = iyMin; iy <= iyMax; iy++) {
+      for (let ix = ixMin; ix <= ixMax; ix++) {
+        const i  = iy * numCols + ix;
+        const vx = (ix / widthSegments - 0.5) * width;
+        const vz = (iy / heightSegments - 0.5) * height;
+        const ox = Math.max(0, Math.abs(vx - cx) - half);
+        const oz = Math.max(0, Math.abs(vz - cz) - half);
+        if (ox === 0 && oz === 0) {
+          positions.setZ(i, targetH);
+        } else {
+          const d = Math.sqrt(ox * ox + oz * oz);
+          if (d < blendDist) {
+            const t = d / blendDist;
+            const blend = t * t * (3 - 2 * t);
+            positions.setZ(i, targetH + (positions.getZ(i) - targetH) * blend);
+          }
+        }
+      }
+    }
+    positions.needsUpdate = true;
+    terrainNormalsDirty = true;
+  }
+
+  function flushNormals() {
+    if (!land || !terrainNormalsDirty) return;
+    terrainNormalsDirty = false;
+    land.geometry.computeVertexNormals();
+  }
+
   return {
     pathState, placeTile, setPathAt, removePathAt,
     beginStroke, endStroke, clearTiles, removeTilesOutOfRange,
-    refreshPreviewMaterial, updatePreview, preview,
+    refreshPreviewMaterial, updatePreview, preview, flushNormals,
   };
 }
 
@@ -394,6 +443,9 @@ function getPathTexture(type) {
   } else if (type === "water") {
     texture = buildWaterTexture();
     repeat[0] = repeat[1] = 1.0;
+  } else if (type === "road") {
+    texture = loadGLBTexture("/materials/road_basic_maker.glb", buildRoadPlaceholder);
+    repeat[0] = repeat[1] = 1.8;
   }
 
   if (texture) {
@@ -510,6 +562,24 @@ function buildSandTexture() {
   }
   ctx.globalAlpha = 1;
 
+  return makeCanvasTexture(canvas);
+}
+
+function buildRoadPlaceholder() {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#6a6a6a";
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(size, 20); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, size - 20); ctx.lineTo(size, size - 20); ctx.stroke();
+  ctx.setLineDash([22, 14]);
+  ctx.strokeStyle = "rgba(255,255,255,0.50)";
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(size / 2, 0); ctx.lineTo(size / 2, size); ctx.stroke();
   return makeCanvasTexture(canvas);
 }
 
