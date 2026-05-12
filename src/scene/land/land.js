@@ -13,20 +13,60 @@ export function createLand() {
   );
 
   const loader = new THREE.TextureLoader();
-  const diffuse = loader.load(
+
+  const rockTex = loader.load(
     "/rocky_terrain/textures/rocky_terrain_02_diff_4k.jpg",
   );
-  diffuse.wrapS = diffuse.wrapT = THREE.RepeatWrapping;
-  diffuse.repeat.set(20, 20); // tile every 20 world units across the 400×400 land
-  diffuse.colorSpace = THREE.SRGBColorSpace;
+  rockTex.wrapS = rockTex.wrapT = THREE.RepeatWrapping;
+  rockTex.repeat.set(20, 20);
+  rockTex.colorSpace = THREE.SRGBColorSpace;
+
+  const sandTex = loader.load(
+    "/textures/sand/sand/textures/gravelly_sand_diff_4k.jpg",
+  );
+  sandTex.wrapS = sandTex.wrapT = THREE.RepeatWrapping;
+  sandTex.repeat.set(20, 20);
+  sandTex.colorSpace = THREE.SRGBColorSpace;
 
   const material = new THREE.MeshStandardMaterial({
-    map: diffuse,
-    vertexColors: true, // vertex colors multiply on top for height-based tinting
+    map: rockTex,
+    vertexColors: true,
     roughness: 0.92,
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
+
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.sandMap = { value: sandTex };
+
+    // Pass local Z (= terrain height before plane rotation) to fragment shader
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <common>",
+      "#include <common>\nvarying float vTerrainHeight;",
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      "#include <begin_vertex>\nvTerrainHeight = position.z;",
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <common>",
+      "#include <common>\nuniform sampler2D sandMap;\nvarying float vTerrainHeight;",
+    );
+
+    // Blend sand (low) → rock (high) based on terrain height
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <map_fragment>",
+      `
+      #ifdef USE_MAP
+        vec4 rockSample = texture2D(map, vMapUv);
+        vec4 sandSample = texture2D(sandMap, vMapUv);
+        float blend = smoothstep(0.5, 2.5, vTerrainHeight);
+        diffuseColor *= mix(sandSample, rockSample, blend);
+      #endif
+      `,
+    );
+  };
 
   const land = new THREE.Mesh(geometry, material);
   land.name = "land";
