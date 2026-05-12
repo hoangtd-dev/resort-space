@@ -4,7 +4,7 @@ import { createLand } from "./land/land";
 import { createLights } from "./lights/lights";
 import { createOcean } from "./ocean/ocean";
 import { createGrid } from "./grid/grid";
-import { createPaths } from "./paths/paths";
+
 
 export function createScene() {
   const scene = new THREE.Scene();
@@ -18,9 +18,6 @@ export function createScene() {
 
   const land = createLand();
   scene.add(land);
-
-  // Paths sample terrain height — must come after land is set up
-  scene.add(createPaths(land));
 
   scene.add(createGrid());
 

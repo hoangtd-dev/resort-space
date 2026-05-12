@@ -12,6 +12,10 @@ export const ZONE_ANY = "any";
 // Objects not listed default to ZONE_LAND.
 export const OBJECT_ZONES = {
   tow_boat: ZONE_BEACH_SEA,
+  tugboat:  ZONE_BEACH_SEA,
+  sailboat: ZONE_BEACH_SEA,
+  titanic:  ZONE_BEACH_SEA,
+  yacht:    ZONE_BEACH_SEA,
 };
 
 // Returns the zone for a world position based on terrain height.

@@ -183,7 +183,8 @@ export function createObjectTool({
     instancer.add(config.path, x, y, z, keys, scale);
   }
 
-  function placeObjectOfType(type, wx, wz) {
+  // yOverride: fixed world-Y for water objects (skips terrain sampling + flattening).
+  function placeObjectOfType(type, wx, wz, yOverride = null) {
     const config = OBJECT_CONFIGS[type];
     if (!config) return;
     const { x, z } = snapForObject(wx, wz, config.cols, config.rows);
@@ -193,8 +194,8 @@ export function createObjectTool({
     keys.forEach((k) => occupiedCells.add(k));
     const scale = OBJECT_SCALES[type] ?? 1;
     loadModel(config, () => {
-      const y = getSampleHeight()(x, z);
-      if (config.cols > 1 || config.rows > 1)
+      const y = yOverride !== null ? yOverride : getSampleHeight()(x, z);
+      if (yOverride === null && (config.cols > 1 || config.rows > 1))
         flattenTerrainUnder(x, z, config.cols * scale, config.rows * scale, y);
       instancer.add(config.path, x, y, z, keys, scale);
     });

@@ -45,6 +45,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   const pathTool = createPathTool({
     scene,
+    land,
     occupiedCells,
     getSampleHeight,
     getHalfSize: () => land.geometry.parameters.width / 2,
@@ -218,8 +219,8 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
 
   function initDefaultLayout() {
     // Objects first so their footprints block any conflicting path tiles.
-    for (const { type, wx, wz } of DEFAULT_OBJECTS) {
-      objectTool.placeObjectOfType(type, wx, wz);
+    for (const { type, wx, wz, y } of DEFAULT_OBJECTS) {
+      objectTool.placeObjectOfType(type, wx, wz, y ?? null);
     }
     for (const { wx, wz, type } of DEFAULT_PATHS) {
       pathTool.setPathAt(wx, wz, type);
@@ -240,6 +241,7 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     pathTool.updatePreview({ hasHit, lastHitWorld, placementState });
     objectTool.updatePreview({ hasHit, lastHitWorld, placementState });
     objectTool.flushTerrainNormals();
+    pathTool.flushNormals();
     hillTool.update(dt, { hasHit, lastHitWorld });
 
     if (
