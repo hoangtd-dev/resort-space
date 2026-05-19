@@ -149,6 +149,11 @@ export function createObjectTool({
   function clearObjects() {
     occupiedCells.clear();
     instancer.clear();
+    // Cancel pending async placement callbacks so stale placements don't
+    // fire after a clear/resize and create duplicate ghost instances.
+    for (const entry of modelCache.values()) {
+      entry.callbacks = [];
+    }
   }
 
   function removeInstance(im, instanceId) {

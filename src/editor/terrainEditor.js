@@ -6,8 +6,10 @@ import { createHillToolPalette } from "./hillToolPalette";
 import { createPathTool } from "./pathTool";
 import { createObjectTool } from "./objectTool";
 import { createPlacementToolPalette } from "./placementToolPalette";
-import { applyDefaultTerrain } from "../scene/land/defaultTerrain";
+import { applyDefaultTerrain, applyVertexColors } from "../scene/land/defaultTerrain";
 import { DEFAULT_PATHS, DEFAULT_OBJECTS } from "../scene/land/defaultLayout";
+import { createResizePalette } from "./resizePalette";
+import { LAND_SEGMENTS } from "../scene/land/land";
 
 export function createTerrainEditor({ scene, camera, controls, renderer }) {
   const land = scene.getObjectByName("land");
@@ -72,11 +74,17 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   let gridHelper = scene.getObjectByName("grid");
   if (gridHelper) gridHelper.visible = false;
 
-  // Bottom-left palette row: placement + hill bubbles on a single line.
+  const resizePalette = createResizePalette({
+    onResize: resizeLand,
+    getCurrentSize: () => land.geometry.parameters.width,
+  });
+
+  // Bottom-left palette row: placement + hill + resize bubbles on a single line.
   const bottomLeftStack = document.createElement("div");
   bottomLeftStack.className = "bottom-left-stack";
   bottomLeftStack.appendChild(placementPalette.element);
   bottomLeftStack.appendChild(hillPalette.element);
+  bottomLeftStack.appendChild(resizePalette.element);
   document.body.appendChild(bottomLeftStack);
 
   // Default layout
@@ -170,23 +178,26 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
   function resizeLand(newSize) {
     const gridWasVisible = gridHelper ? gridHelper.visible : false;
 
+    const oldSize = land.geometry.parameters.width;
+    const scale = oldSize / newSize;
     const oldSample = sampleHeight;
     const newGeom = new THREE.PlaneGeometry(
       newSize,
       newSize,
-      newSize * 2,
-      newSize * 2,
+      LAND_SEGMENTS,
+      LAND_SEGMENTS,
     );
     const newPos = newGeom.attributes.position;
     for (let i = 0; i < newPos.count; i++) {
-      const h = oldSample(newPos.getX(i), -newPos.getY(i));
-      if (h !== 0) newPos.setZ(i, h);
+      // Scale back to old coordinate space so the island shape scales proportionally.
+      newPos.setZ(i, oldSample(newPos.getX(i) * scale, -newPos.getY(i) * scale));
     }
     newPos.needsUpdate = true;
     newGeom.computeVertexNormals();
 
     land.geometry.dispose();
     land.geometry = newGeom;
+    applyVertexColors(land);
     sampleHeight = makeHeightSampler(land);
 
     const divisions = Math.round((newSize * 2) / GRID_CELL_SIZE);
@@ -211,10 +222,11 @@ export function createTerrainEditor({ scene, camera, controls, renderer }) {
     gridHelper.visible = gridWasVisible;
     scene.add(gridHelper);
 
-    // Remove only items that now fall outside the new land bounds.
-    const half = newSize / 2;
-    pathTool.removeTilesOutOfRange(half);
-    objectTool.removeObjectsOutOfRange(half);
+    // Clear everything, then re-place the default layout at the new size.
+    pathTool.clearTiles();
+    objectTool.clearObjects();
+    occupiedCells.clear();
+    initDefaultLayout();
   }
 
   function initDefaultLayout() {
