@@ -80,6 +80,14 @@ export const OBJECT_CONFIGS = {
     cols: 1,
     rows: 1,
   },
+  port: {
+    label: "Port",
+    category: "building",
+    path: "/materials/Port.glb",
+    thumb: null,
+    cols: 6,
+    rows: 6,
+  },
   simple_wooden_pier_or_dock: {
     label: "Wooden Pier",
     category: "building",
@@ -88,14 +96,6 @@ export const OBJECT_CONFIGS = {
     cols: 3,
     rows: 6,
   },
-  road: {
-    label: "Road",
-    category: "building",
-    path: "/materials/road.glb",
-    thumb: null,
-    cols: 6,
-    rows: 2,
-  },
   road_basic_maker: {
     label: "Road Segment",
     category: "building",
@@ -103,15 +103,6 @@ export const OBJECT_CONFIGS = {
     thumb: null,
     cols: 2,
     rows: 6,
-  },
-  fishing_boat: {
-    label: "Fishing Boat",
-    category: "tree",
-    path: "/materials/fishing_boat.glb",
-    thumb: null,
-    cols: 2,
-    rows: 2,
-    hidden: true,
   },
   tow_boat: {
     label: "Tow Boat",

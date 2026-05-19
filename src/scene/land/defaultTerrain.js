@@ -1,18 +1,24 @@
 import * as THREE from "three";
 
+// computeHeight is tuned for a 400×400 terrain (coords -200..+200).
+// Normalize to that space so the shape scales correctly at any terrain size.
+const REFERENCE_SIZE = 400;
+
 export function applyDefaultTerrain(land) {
   const geo = land.geometry;
   const pos = geo.attributes.position;
   const { width, height, widthSegments, heightSegments } = geo.parameters;
   const cols = widthSegments + 1;
   const rows = heightSegments + 1;
+  const scaleX = REFERENCE_SIZE / width;
+  const scaleZ = REFERENCE_SIZE / height;
 
   for (let iy = 0; iy < rows; iy++) {
     for (let ix = 0; ix < cols; ix++) {
       const i = iy * cols + ix;
       const wx = (ix / widthSegments - 0.5) * width;
       const wz = (iy / heightSegments - 0.5) * height;
-      pos.setZ(i, computeHeight(wx, wz));
+      pos.setZ(i, computeHeight(wx * scaleX, wz * scaleZ));
     }
   }
 
@@ -127,7 +133,7 @@ const HILL   = [0.30, 0.50, 0.22]; // hillside
 const SUMMIT = [0.24, 0.40, 0.17]; // highland
 const ROCK   = [0.50, 0.46, 0.40]; // steep slope / cliff face
 
-function applyVertexColors(land) {
+export function applyVertexColors(land) {
   const geo = land.geometry;
   const pos = geo.attributes.position;
   const normals = geo.attributes.normal;
